@@ -52,6 +52,12 @@ export default function Caja() {
       if (res.ok) {
         const data = await res.json();
         setPendientes(data);
+        // Actualizar ordenSeleccionada si sigue pendiente (para mostrar datos nuevos)
+        setOrdenSeleccionada((prev) => {
+          if (!prev) return prev;
+          const updated = data.find((o) => o.id === prev.id);
+          return updated || prev;
+        });
       }
     } catch {}
   };
@@ -210,9 +216,16 @@ export default function Caja() {
                       return cant > 1 ? `${nombre} ×${cant}` : nombre;
                     }).join("  ·  ")}
                   </div>
+                  {o.patente && (
+                    <div style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ background: "#1a2744", color: "#93c5fd", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 2, padding: "2px 10px", borderRadius: 5 }}>🚗 {o.patente}</span>
+                      {(o.marca || o.modelo) && <span style={{ fontSize: 11, color: "#555" }}>{[o.marca, o.modelo].filter(Boolean).join(' ')}</span>}
+                    </div>
+                  )}
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: o.cliente ? "#3b82f6" : "#333", display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: o.cliente ? "#3b82f6" : "#333" }}>
                       {o.cliente ? `👤 ${o.cliente}` : "Sin nombre"}
+                      {o.telefono ? ` · 📞 ${o.telefono}` : ""}
                     </span>
                     <span style={{ fontSize: 11, color: "#444" }}>{(o.items||[]).length} servicio{(o.items||[]).length !== 1 ? "s" : ""}</span>
                   </div>
@@ -227,8 +240,16 @@ export default function Caja() {
                 <div className="fade-in" style={{ flex: 1, display: "flex", flexDirection: "column", padding: 24 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
                     <div>
-                      <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 22, fontWeight: 800, color: "#fff" }}>Orden de Gomería</div>
-                      <div style={{ fontSize: 12, color: "#555", marginTop: 2 }}>Recibida a las {ordenSeleccionada.hora} {ordenSeleccionada.cliente ? `· 👤 ${ordenSeleccionada.cliente}` : ""}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 22, fontWeight: 800, color: "#fff" }}>Orden de Gomería</div>
+                        {ordenSeleccionada.patente && <span style={{ background: "#1a2744", color: "#93c5fd", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 15, fontWeight: 700, letterSpacing: 2, padding: "3px 12px", borderRadius: 6 }}>{ordenSeleccionada.patente}</span>}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#555", marginTop: 2 }}>
+                        {ordenSeleccionada.hora}
+                        {ordenSeleccionada.marca || ordenSeleccionada.modelo ? ` · ${[ordenSeleccionada.marca, ordenSeleccionada.modelo].filter(Boolean).join(' ')}` : ""}
+                        {ordenSeleccionada.cliente ? ` · 👤 ${ordenSeleccionada.cliente}` : ""}
+                        {ordenSeleccionada.telefono ? ` · 📞 ${ordenSeleccionada.telefono}` : ""}
+                      </div>
                     </div>
                     <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 38, fontWeight: 800, color: "#fff" }}>${totalOrden(ordenSeleccionada.items).toLocaleString("es-AR")}</div>
                   </div>
