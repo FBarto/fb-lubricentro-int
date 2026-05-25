@@ -197,16 +197,24 @@ export default function Caja() {
                 <div key={o.id} className="row-orden" onClick={() => { setOrdenSeleccionada(o); setFormaPago(""); setClienteCobro(""); setMarketing(""); }}
                   style={{ padding: "14px 16px", borderBottom: "1px solid #141414", background: sel ? "#0f1f40" : "transparent", borderLeft: sel ? "3px solid #3b82f6" : "3px solid transparent", transition: "all 0.15s" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                    <div>
-                      <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 16, fontWeight: 700, color: "#fff" }}>{o.id}</span>
-                      <span style={{ marginLeft: 8, fontSize: 11, color: "#555", background: "#1a1a1a", padding: "2px 6px", borderRadius: 4 }}>Gomería</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, fontWeight: 700, color: "#fff", background: "#1d4ed8", padding: "2px 10px", borderRadius: 5 }}>🔧 GOMERÍA</span>
+                      <span style={{ fontSize: 11, color: "#555" }}>{o.hora}</span>
                     </div>
-                    <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 18, fontWeight: 700, color: "#3b82f6" }}>${tot.toLocaleString("es-AR")}</span>
+                    <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 20, fontWeight: 800, color: "#3b82f6" }}>${tot.toLocaleString("es-AR")}</span>
                   </div>
-                  <div style={{ fontSize: 12, color: "#555", marginBottom: 4 }}>{(o.items || []).map((i) => `${i.nombre} ×${i.cantidad}`).join(" · ")}</div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 11, color: o.cliente ? "#888" : "#333" }}>{o.cliente || "Sin nombre"}</span>
-                    <span style={{ fontSize: 11, color: "#444" }}>🕐 {o.hora}</span>
+                  <div style={{ fontSize: 13, color: "#ccc", fontWeight: 500, marginBottom: 5, lineHeight: 1.5 }}>
+                    {(o.items || []).map((i) => {
+                      const nombre = i.nombre || i.nombre_item || "Servicio";
+                      const cant = Number(i.cantidad) || 1;
+                      return cant > 1 ? `${nombre} ×${cant}` : nombre;
+                    }).join("  ·  ")}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: o.cliente ? "#3b82f6" : "#333", display: "flex", alignItems: "center", gap: 4 }}>
+                      {o.cliente ? `👤 ${o.cliente}` : "Sin nombre"}
+                    </span>
+                    <span style={{ fontSize: 11, color: "#444" }}>{(o.items||[]).length} servicio{(o.items||[]).length !== 1 ? "s" : ""}</span>
                   </div>
                 </div>
               );
@@ -219,8 +227,8 @@ export default function Caja() {
                 <div className="fade-in" style={{ flex: 1, display: "flex", flexDirection: "column", padding: 24 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
                     <div>
-                      <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 28, fontWeight: 800, color: "#fff" }}>{ordenSeleccionada.id}</div>
-                      <div style={{ fontSize: 12, color: "#555" }}>Cargado desde Gomería · {ordenSeleccionada.hora}</div>
+                      <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 22, fontWeight: 800, color: "#fff" }}>Orden de Gomería</div>
+                      <div style={{ fontSize: 12, color: "#555", marginTop: 2 }}>Recibida a las {ordenSeleccionada.hora} {ordenSeleccionada.cliente ? `· 👤 ${ordenSeleccionada.cliente}` : ""}</div>
                     </div>
                     <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 38, fontWeight: 800, color: "#fff" }}>${totalOrden(ordenSeleccionada.items).toLocaleString("es-AR")}</div>
                   </div>
@@ -228,10 +236,10 @@ export default function Caja() {
                     {(ordenSeleccionada.items || []).map((item, i) => (
                       <div key={i} style={{ padding: "12px 16px", borderBottom: i < ordenSeleccionada.items.length - 1 ? "1px solid #1a1a1a" : "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
-                          <div style={{ fontSize: 14, color: "#ddd", fontWeight: 500 }}>{item.nombre}</div>
-                          <div style={{ fontSize: 12, color: "#555" }}>${Number(item.precio).toLocaleString()} × {item.cantidad}</div>
+                          <div style={{ fontSize: 14, color: "#ddd", fontWeight: 500 }}>{item.nombre || item.nombre_item || "Servicio"}</div>
+                          <div style={{ fontSize: 12, color: "#555" }}>${Number(item.precio || item.precio_unitario || 0).toLocaleString("es-AR")} × {item.cantidad}</div>
                         </div>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>${(Number(item.precio) * Number(item.cantidad)).toLocaleString("es-AR")}</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>${(Number(item.precio || item.precio_unitario || 0) * Number(item.cantidad)).toLocaleString("es-AR")}</div>
                       </div>
                     ))}
                   </div>
@@ -285,17 +293,46 @@ export default function Caja() {
                   style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: categoriaFiltro === c ? "#1d4ed8" : "#1a1a1a", color: categoriaFiltro === c ? "#fff" : "#666", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{c}</button>
               ))}
             </div>
-            <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 8, alignContent: "start" }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 8, alignContent: "start" }}>
               {productosFiltrados.map((p) => {
                 const enCarrito = carritoLocal.find((i) => i.id === p.id);
+                const altCodes = p.cod_alternativo ? p.cod_alternativo.split(" | ").filter(Boolean) : [];
                 return (
                   <button key={p.id} className="prod-btn" onClick={() => agregarProducto(p)}
-                    style={{ background: enCarrito ? "#0f1f40" : "#111", border: `1px solid ${enCarrito ? "#3b82f6" : "#1e1e1e"}`, borderRadius: 10, padding: "14px 12px", cursor: "pointer", textAlign: "left", position: "relative", transition: "all 0.15s" }}>
+                    style={{ background: enCarrito ? "#0f1f40" : "#111", border: `1px solid ${enCarrito ? "#3b82f6" : "#1e1e1e"}`, borderRadius: 10, padding: "12px", cursor: "pointer", textAlign: "left", position: "relative", transition: "all 0.15s" }}>
                     {enCarrito && <span style={{ position: "absolute", top: 8, right: 8, background: "#3b82f6", color: "#fff", borderRadius: "50%", width: 22, height: 22, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{enCarrito.cantidad}</span>}
-                    <div style={{ fontSize: 10, color: "#444", marginBottom: 4, letterSpacing: 1 }}>{p.codigo}</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: enCarrito ? "#93c5fd" : "#ccc", marginBottom: 6, lineHeight: 1.3 }}>{p.nombre}</div>
-                    <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>{p.categoria}</div>
-                    <div style={{ fontSize: 17, fontWeight: 700, color: enCarrito ? "#3b82f6" : "#fff", fontFamily: "'Barlow Condensed',sans-serif" }}>${Number(p.precio).toLocaleString("es-AR")}</div>
+                    {/* Código principal */}
+                    {p.codigo && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
+                        <span style={{ fontSize: 9, color: "#555", letterSpacing: 1, textTransform: "uppercase" }}>Código</span>
+                        <span style={{ fontSize: 11, color: "#888", fontFamily: "monospace", background: "#1a1a1a", padding: "1px 6px", borderRadius: 4 }}>{p.codigo}</span>
+                      </div>
+                    )}
+                    {/* Nombre */}
+                    <div style={{ fontSize: 13, fontWeight: 600, color: enCarrito ? "#93c5fd" : "#ccc", marginBottom: 6, lineHeight: 1.3 }}>{p.nombre}</div>
+                    {/* Categoría */}
+                    {p.categoria && (
+                      <div style={{ fontSize: 10, color: "#555", marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ background: "#1a1a1a", padding: "2px 7px", borderRadius: 4, color: "#666" }}>{p.categoria}</span>
+                      </div>
+                    )}
+                    {/* Códigos alternativos */}
+                    {altCodes.length > 0 && (
+                      <div style={{ marginBottom: 6, display: "flex", flexWrap: "wrap", gap: 3 }}>
+                        {altCodes.slice(0, 4).map((ac, i) => {
+                          const [marca, cod] = ac.split(":");
+                          return cod ? (
+                            <span key={i} style={{ fontSize: 9, background: "#1a1a2e", color: "#8b5cf6", padding: "2px 6px", borderRadius: 4, fontFamily: "monospace" }}>
+                              {marca}: {cod}
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
+                    {/* Precio */}
+                    <div style={{ fontSize: 18, fontWeight: 700, color: enCarrito ? "#3b82f6" : "#fff", fontFamily: "'Barlow Condensed',sans-serif", marginTop: 4 }}>
+                      ${Number(p.precio).toLocaleString("es-AR")}
+                    </div>
                   </button>
                 );
               })}
