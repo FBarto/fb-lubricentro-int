@@ -1,16 +1,4 @@
-import { useState } from "react";
-
-const SERVICIOS = [
-  { id: "parche_auto", label: "Parche Auto", icon: "🚗", grupo: "Autos", precio: 2500 },
-  { id: "arme_desarme_auto", label: "Arme / Desarme", icon: "🔧", grupo: "Autos", precio: 1800 },
-  { id: "rotacion", label: "Rotación", icon: "🔄", grupo: "Autos", precio: 2000 },
-  { id: "parche_moto", label: "Parche Moto", icon: "🏍️", grupo: "Motos", precio: 1500 },
-  { id: "arme_desarme_moto", label: "Arme / Desarme", icon: "🔧", grupo: "Motos", precio: 1200 },
-  { id: "parche_camioneta", label: "Parche Camioneta", icon: "🚚", grupo: "Camionetas", precio: 3500 },
-  { id: "arme_desarme_camioneta", label: "Arme / Desarme", icon: "🔧", grupo: "Camionetas", precio: 2500 },
-  { id: "camaras_cubiertas", label: "Cámaras / Cubiertas", icon: "⭕", grupo: "Otros", precio: 4000 },
-  { id: "fichas_aire", label: "Fichas de Aire", icon: "💨", grupo: "Otros", precio: 500 },
-];
+import { useState, useEffect } from "react";
 
 const GRUPOS = ["Autos", "Motos", "Camionetas", "Otros"];
 
@@ -22,12 +10,25 @@ const GRUPO_COLORS = {
 };
 
 export default function Gomeria() {
+  const [servicios, setServicios] = useState([]);
+  const [cargandoServicios, setCargandoServicios] = useState(true);
   const [carrito, setCarrito] = useState([]);
   const [clienteNombre, setClienteNombre] = useState("");
   const [enviado, setEnviado] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
   const [grupoActivo, setGrupoActivo] = useState("Autos");
+
+  // Cargar servicios desde Sheets al iniciar
+  useEffect(() => {
+    fetch('/api/gomeria/servicios')
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setServicios(data);
+      })
+      .catch(() => setError("No se pudieron cargar los servicios."))
+      .finally(() => setCargandoServicios(false));
+  }, []);
 
   const agregarServicio = (servicio) => {
     setCarrito((prev) => {
@@ -71,8 +72,16 @@ export default function Gomeria() {
     }
   };
 
-  const serviciosDelGrupo = SERVICIOS.filter((s) => s.grupo === grupoActivo);
+  const serviciosDelGrupo = servicios.filter((s) => s.grupo === grupoActivo);
   const colores = GRUPO_COLORS[grupoActivo];
+
+  if (cargandoServicios) return (
+    <div style={{ minHeight: "100vh", background: "#0d0d0d", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+      <div style={{ width: 40, height: 40, border: "3px solid #222", borderTopColor: "#3b82f6", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+      <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 16, color: "#555", letterSpacing: 2 }}>CARGANDO SERVICIOS...</div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
 
   return (
     <div style={{ minHeight: "100vh", background: "#0d0d0d", fontFamily: "'Barlow Condensed', Arial, sans-serif", display: "flex", flexDirection: "column", userSelect: "none" }}>
