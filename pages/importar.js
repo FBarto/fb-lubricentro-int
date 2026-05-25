@@ -39,18 +39,31 @@ export default function Importador() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
         if (!json.length) { setError("El archivo está vacío."); return; }
-        const headers = json[0].map((h) => String(h || "").trim());
-        const rows = json.slice(1).filter((r) => r.some((c) => c !== "" && c !== null && c !== undefined));
+
+        // Detectar fila de encabezados — buscar la primera fila con palabras clave
+        const keywords = ["cod", "desc", "nom", "prec", "valor", "art", "prod", "pvp", "cost", "precio", "venta", "oferta"];
+        let headerRowIdx = 0;
+        for (let i = 0; i < Math.min(20, json.length); i++) {
+          const row = json[i];
+          const text = row.map((c) => String(c || "").toLowerCase()).join(" ");
+          const matches = keywords.filter((k) => text.includes(k)).length;
+          if (matches >= 2) { headerRowIdx = i; break; }
+        }
+
+        const headers = json[headerRowIdx].map((h) => String(h || "").trim()).filter((h) => h !== "");
+        const rows = json.slice(headerRowIdx + 1).filter((r) => r.some((c) => c !== "" && c !== null && c !== undefined));
         setColumnas(headers);
         setFilas(rows);
+
         // Auto-mapeo inteligente
         const autoMapeo = {};
         headers.forEach((h, i) => {
           const hl = h.toLowerCase();
-          if (hl.includes("cod") || hl.includes("art") || hl === "id") autoMapeo[i] = "codigo";
-          else if (hl.includes("nom") || hl.includes("desc") || hl.includes("prod")) autoMapeo[i] = "nombre";
+          if (hl.includes("cod") || hl === "id") autoMapeo[i] = "codigo";
+          else if (hl.includes("desc") || hl.includes("nom") || hl.includes("art") || hl.includes("prod")) autoMapeo[i] = "nombre";
           else if (hl.includes("cat") || hl.includes("rub") || hl.includes("tipo")) autoMapeo[i] = "categoria";
-          else if (hl.includes("prec") || hl.includes("valor") || hl.includes("pvp") || hl.includes("cost")) autoMapeo[i] = "precio";
+          else if (hl.includes("venta") || hl.includes("pvp") || hl.includes("precio") || hl.includes("oferta")) autoMapeo[i] = "precio";
+          else if (hl.includes("cost") || hl.includes("valor")) autoMapeo[i] = "precio";
           else autoMapeo[i] = "ignorar";
         });
         setMapeo(autoMapeo);
