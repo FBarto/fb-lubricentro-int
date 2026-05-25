@@ -279,15 +279,38 @@ export default function Caja() {
                     </div>
                   </div>
                   <div style={{ marginBottom: 20 }}>
-                    <label style={{ fontSize: 11, color: "#555", letterSpacing: 1, textTransform: "uppercase", display: "block", marginBottom: 8 }}>Forma de Pago *</label>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
-                      {FORMAS_PAGO.map((fp) => (
-                        <button key={fp.id} onClick={() => setFormaPago(fp.id)}
-                          style={{ padding: "12px 8px", borderRadius: 8, border: `2px solid ${formaPago === fp.id ? "#3b82f6" : "#1e1e1e"}`, background: formaPago === fp.id ? "#0f1f40" : "#111", color: formaPago === fp.id ? "#93c5fd" : "#555", fontSize: 11, fontWeight: 600, cursor: "pointer", textAlign: "center", transition: "all 0.15s" }}>
-                          <div style={{ fontSize: 20, marginBottom: 4 }}>{fp.icon}</div>{fp.label}
-                        </button>
-                      ))}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <label style={{ fontSize: 11, color: "#555", letterSpacing: 1, textTransform: "uppercase" }}>Forma de Pago *</label>
+                      {ordenSeleccionada.es_efectivo === 'true' && (
+                        <span style={{ fontSize: 10, background: "#16a34a22", color: "#4ade80", padding: "2px 8px", borderRadius: 4, border: "1px solid #16a34a44" }}>
+                          💵 Precio efectivo aplicado
+                        </span>
+                      )}
                     </div>
+                    {ordenSeleccionada.es_efectivo === 'true' ? (
+                      <div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8, opacity: 0.3, pointerEvents: "none" }}>
+                          {FORMAS_PAGO.filter(fp => fp.id !== 'efectivo').map((fp) => (
+                            <div key={fp.id} style={{ padding: "12px 8px", borderRadius: 8, border: "2px solid #1e1e1e", background: "#111", color: "#333", fontSize: 11, fontWeight: 600, textAlign: "center" }}>
+                              <div style={{ fontSize: 20, marginBottom: 4 }}>{fp.icon}</div>{fp.label}
+                            </div>
+                          ))}
+                        </div>
+                        <button onClick={() => setFormaPago('efectivo')}
+                          style={{ width: "100%", marginTop: 8, padding: "14px", border: `2px solid ${formaPago === 'efectivo' ? "#16a34a" : "#16a34a66"}`, borderRadius: 9, background: formaPago === 'efectivo' ? "#16a34a22" : "#111", color: formaPago === 'efectivo' ? "#4ade80" : "#16a34a", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 17, fontWeight: 800, cursor: "pointer", letterSpacing: 1 }}>
+                          💵 EFECTIVO — precio especial aplicado
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
+                        {FORMAS_PAGO.map((fp) => (
+                          <button key={fp.id} onClick={() => setFormaPago(fp.id)}
+                            style={{ padding: "12px 8px", borderRadius: 8, border: `2px solid ${formaPago === fp.id ? "#3b82f6" : "#1e1e1e"}`, background: formaPago === fp.id ? "#0f1f40" : "#111", color: formaPago === fp.id ? "#93c5fd" : "#555", fontSize: 11, fontWeight: 600, cursor: "pointer", textAlign: "center", transition: "all 0.15s" }}>
+                            <div style={{ fontSize: 20, marginBottom: 4 }}>{fp.icon}</div>{fp.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div style={{ flex: 1 }} />
                   <button onClick={cobrarOrden} disabled={!formaPago || cobrandoId === ordenSeleccionada.id}

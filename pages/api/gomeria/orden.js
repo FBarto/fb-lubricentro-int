@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { items, cliente_nombre, patente, marca, modelo, telefono } = req.body;
+  const { items, cliente_nombre, patente, marca, modelo, telefono, es_efectivo } = req.body;
   if (!items || items.length === 0)
     return res.status(400).json({ error: 'items requeridos' });
 
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     await appendRow(sheets, 'ventas', [
       ventaId, fecha, hora, 'gomeria', 'pendiente',
       '', cliente_nombre || '', '', total, '',
-      patente || '', marca || '', modelo || '', telefono || '', vehiculo || ''
+      patente || '', marca || '', modelo || '', telefono || '', vehiculo || '', es_efectivo ? 'true' : 'false'
     ]);
 
     for (const item of items) {
