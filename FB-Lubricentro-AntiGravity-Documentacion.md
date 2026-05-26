@@ -19,8 +19,9 @@ El sistema fue diseñado con una arquitectura progresiva: arranca simple (Sheets
 | Gomería | `https://fb-lubricentro-int-1yii.vercel.app/gomeria` | Tablet |
 | Caja | `https://fb-lubricentro-int-1yii.vercel.app/caja` | PC |
 | Importador | `https://fb-lubricentro-int-1yii.vercel.app/importar` | PC |
+| Dashboard | `https://fb-lubricentro-int-1yii.vercel.app/dashboard` | PC (dueño) |
 
-> **Nota:** Actualmente las páginas son **abiertas** (sin login). Cualquiera con la URL puede acceder. La autenticación es una mejora pendiente para próximos sprints.
+> **Nota:** `/dashboard` requiere login. El resto de las páginas son abiertas por ahora.
 
 ---
 
@@ -98,10 +99,12 @@ fb-lubricentro/
 │   └── sheets.js              # Cliente Google Sheets + helpers (getRows, appendRow, updateRowWhere)
 ├── pages/
 │   ├── _app.js                # Wrapper global de React
-│   ├── index.js               # Pantalla de inicio (selector de módulo)
+│   ├── _document.js           # HTML base — carga Google Fonts globalmente
+│   ├── index.js               # Pantalla de inicio (selector de módulo: Gomería / Caja / Dashboard)
 │   ├── gomeria.js             # UI de la tablet del gomero
 │   ├── caja.js                # UI de la PC de caja
 │   ├── importar.js            # Importador de listas de proveedores
+│   ├── dashboard.js           # Dashboard de métricas (requiere login)
 │   └── api/
 │       ├── gomeria/
 │       │   ├── orden.js       # POST: crea orden desde gomería
@@ -115,6 +118,8 @@ fb-lubricentro/
 │       │   │   └── [id].js    # POST: marca orden como cobrada
 │       │   ├── venta-local.js # POST: venta directa desde caja
 │       │   └── historial.js   # GET: ventas del día actual (filtra por fecha === hoy)
+│       ├── dashboard/
+│       │   └── metricas.js    # GET: métricas con filtro ?desde=&hasta=&modo=
 │       └── productos/
 │           ├── index.js       # GET: busca productos por nombre/código
 │           └── importar.js    # POST: importa lista de proveedor
@@ -274,6 +279,12 @@ El stock se descuenta en Sheets al enviar la orden. Si la conexión cae entre el
 | POST | `/api/caja/venta-local` | Registra venta directa desde caja (sin gomería) | `{ items, forma_pago, cliente, marketing }` |
 | GET | `/api/caja/historial` | Ventas del día actual | — |
 
+### Dashboard
+
+| Método | Endpoint | Descripción | Body / Params |
+|---|---|---|---|
+| GET | `/api/dashboard/metricas` | Métricas completas con comparativas | `?desde=DD/MM/AAAA&hasta=DD/MM/AAAA&modo=hoy\|semana\|mes\|custom` |
+
 ### Productos (lubricentro)
 
 | Método | Endpoint | Descripción |
@@ -291,7 +302,9 @@ El stock se descuenta en Sheets al enviar la orden. Si la conexión cae entre el
 |---|---|
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Email de la cuenta de servicio de Google Cloud (ej: `fb-lubricentro@proyecto.iam.gserviceaccount.com`) |
 | `GOOGLE_PRIVATE_KEY` | Clave privada del JSON de Google Cloud. Vercel escapa los `\n`, el código los restaura con `.replace(/\\n/g, '\n')` |
-| `SPREADSHEET_ID` | Solo el ID del Google Sheet (el valor entre `/d/` y `/edit` en la URL) |
+| `SPREADSHEET_ID` | **Solo el ID**, no la URL completa. Ej: `1o79ecbzAu7XD9q7kkX6edoaHqZVLyB3W06tAFw6OOYs` |
+
+> ⚠️ **Error frecuente:** pegar la URL completa del Sheet como `SPREADSHEET_ID`. Tiene que ser solo el fragmento entre `/d/` y `/edit`.
 
 ### En desarrollo local
 
@@ -353,11 +366,12 @@ Crear `.env.local` en la raíz con las mismas variables. Este archivo está en `
 
 ## 15. Roadmap — próximas versiones
 
-- [ ] **Autenticación básica** — proteger `/caja` y `/importar` con login simple
-- [ ] **Dashboard de métricas** — ventas del día/semana/mes, formas de pago, origen de clientes, con filtros de fecha
+- [x] **Dashboard de métricas** *(Sprint 2)* — ventas del día/semana/mes, formas de pago, franja horaria, top servicios, alertas de stock
+- [x] **Login para dashboard** *(Sprint 2)* — usuario/contraseña hardcodeado, sesión en sessionStorage
+- [ ] **Autenticación completa** — proteger `/caja` y `/importar`, migrar a NextAuth o similar
 - [ ] **Módulo completo de lubricentro** — catálogo de productos con búsqueda avanzada
 - [ ] **Base de datos de clientes por patente** — historial de atenciones por vehículo
-- [ ] **Historial con paginación y filtros** — consulta de días anteriores
+- [ ] **Historial con paginación y filtros** — consulta de días anteriores desde caja
 - [ ] **Google Business Profile API** — gestión de reseñas
 - [ ] **Migración a PostgreSQL vía Prisma** — reemplaza Google Sheets como DB principal
 
@@ -382,4 +396,38 @@ Repositorio, credenciales y accesos en poder del cliente.
 
 ---
 
-*Documentación actualizada: Sprint 1 — 25/05/2026*
+## 18. Login del dashboard
+
+| Campo | Valor |
+|---|---|
+| Usuario | `admin` |
+| Contraseña | `fb2026` |
+| Implementación | Hardcodeado en `pages/dashboard.js` (constantes `USUARIO` / `PASSWORD`) |
+| Sesión | `sessionStorage` — se limpia al cerrar el browser |
+| Alcance | Solo protege `/dashboard`. El resto del sistema es abierto |
+
+> Para cambiar las credenciales: editar las constantes en la línea 4-5 de `pages/dashboard.js` y hacer push a `main`.
+
+---
+
+## 19. API `/api/dashboard/metricas`
+
+Devuelve en un solo llamado:
+
+| Campo | Descripción |
+|---|---|
+| `metricas` | Total $, cantidad, desglose por forma de pago del rango solicitado |
+| `metricasAnterior` | Mismas métricas del período anterior equivalente |
+| `top` | Top 10 servicios/productos por cantidad vendida |
+| `franjaHoraria` | Monto vendido por hora (0-23) del período |
+| `alertasStock` | Productos con `stock <= alerta_stock` (siempre, independiente del período) |
+
+**Comparativa según `modo`:**
+- `hoy` → compara con ayer
+- `semana` → compara con mismos días de la semana anterior
+- `mes` → compara con mismos días del mes anterior  
+- `custom` → compara con los N días previos al rango elegido
+
+---
+
+*Documentación actualizada: Sprint 2 — 25/05/2026*
