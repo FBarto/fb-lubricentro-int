@@ -26,6 +26,9 @@ export default function Gomeria() {
   const [modelo, setModelo] = useState("");
   const [telefono, setTelefono] = useState("");
   const [esEfectivo, setEsEfectivo] = useState(false);
+  const [autocompleteResult, setAutocompleteResult] = useState(null);
+  const [buscandoCliente, setBuscandoCliente] = useState(false);
+  const [datosExpandidos, setDatosExpandidos] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -37,6 +40,31 @@ export default function Gomeria() {
     }).catch(() => setError("Error al cargar datos."))
       .finally(() => setCargando(false));
   }, []);
+
+  // Autocomplete por patente
+  useEffect(() => {
+    if (!patente || patente.trim().length < 3) { setAutocompleteResult(null); return; }
+    const timer = setTimeout(async () => {
+      setBuscandoCliente(true);
+      try {
+        const res = await fetch(`/api/gomeria/cliente?patente=${encodeURIComponent(patente.trim())}`);
+        const data = await res.json();
+        setAutocompleteResult(data.found ? data : null);
+      } catch { setAutocompleteResult(null); }
+      finally { setBuscandoCliente(false); }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [patente]);
+
+  const aplicarAutocomplete = () => {
+    if (!autocompleteResult) return;
+    if (autocompleteResult.marca) setMarca(autocompleteResult.marca);
+    if (autocompleteResult.modelo) setModelo(autocompleteResult.modelo);
+    if (autocompleteResult.cliente) setClienteNombre(autocompleteResult.cliente);
+    if (autocompleteResult.telefono) setTelefono(autocompleteResult.telefono);
+    setDatosExpandidos(true);
+    setAutocompleteResult(null);
+  };
 
   const agregarServicio = (s) => {
     setCarrito(prev => {
@@ -73,7 +101,7 @@ export default function Gomeria() {
   const total = carrito.reduce((s, i) => s + getPrecio(i) * i.cantidad, 0);
   const prodEnCarrito = carrito.filter(i => i.tipo === 'producto').length;
 
-  const abrirModal = () => { if (carrito.length === 0) return; setShowModal(true); setError(""); };
+  const abrirModal = () => { if (carrito.length === 0) return; setShowModal(true); setError(""); setDatosExpandidos(false); setAutocompleteResult(null); };
 
   const enviarACaja = async () => {
     setShowModal(false);
@@ -102,7 +130,7 @@ export default function Gomeria() {
       setTimeout(() => {
         setEnviado(false);
         setCarrito([]);
-        setClienteNombre(""); setPatente(""); setMarca(""); setModelo(""); setTelefono(""); setEsEfectivo(false);
+        setClienteNombre(""); setPatente(""); setMarca(""); setModelo(""); setTelefono(""); setEsEfectivo(false); setDatosExpandidos(false); setAutocompleteResult(null);
         // Recargar productos para stock actualizado
         fetch('/api/gomeria/productos').then(r => r.json()).then(data => { if (Array.isArray(data)) setProductos(data); });
       }, 2500);
@@ -127,7 +155,6 @@ export default function Gomeria() {
   return (
     <div style={{ minHeight: "100vh", background: "#0d0d0d", fontFamily: "'Barlow Condensed', Arial, sans-serif", display: "flex", flexDirection: "column", userSelect: "none", position: "relative" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         .btn-svc:active { transform: scale(0.95); }
         .btn-prod:active { transform: scale(0.95); }
@@ -139,6 +166,9 @@ export default function Gomeria() {
         .slide-up { animation: slideUp 0.25s ease-out; }
         @keyframes fabPulse { 0%,100%{box-shadow:0 4px 16px #f9731666} 50%{box-shadow:0 4px 28px #f97316aa} }
         .fab-anim { animation: fabPulse 2s infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .ac-btn:active { transform: scale(0.97); }
+        .toggle-datos:active { background: #1e1e1e !important; }
       `}</style>
 
       {/* Header */}
@@ -272,76 +302,144 @@ export default function Gomeria() {
         </div>
       )}
 
-      {/* Modal datos vehículo */}
+      {/* Modal datos vehículo — rediseñado Sprint 3 */}
       {showModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 70, padding: 20 }}>
-          <div style={{ background: "#111", border: "1px solid #2a2a2a", borderRadius: 16, padding: 22, width: "100%", maxWidth: 380 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 20, fontWeight: 800, color: "#fff", letterSpacing: 1 }}>Datos del vehículo</div>
-              <button onClick={() => setShowModal(false)} style={{ background: "#1a1a1a", border: "1px solid #333", borderRadius: 8, width: 32, height: 32, color: "#666", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 70, padding: 16 }}>
+          <div style={{ background: "#111", border: "1px solid #2a2a2a", borderRadius: 20, width: "100%", maxWidth: 420, maxHeight: "92vh", overflowY: "auto", display: "flex", flexDirection: "column" }}>
+
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 22px 14px", borderBottom: "1px solid #1a1a1a", flexShrink: 0 }}>
+              <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: 1 }}>Datos del vehículo</div>
+              <button onClick={() => setShowModal(false)} style={{ background: "#1a1a1a", border: "1px solid #333", borderRadius: 10, width: 38, height: 38, color: "#666", cursor: "pointer", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
             </div>
 
-            {/* Resumen */}
-            <div style={{ background: "#1a1a1a", borderRadius: 10, padding: "10px 14px", marginBottom: 16, borderLeft: "3px solid #2563eb" }}>
-              <div style={{ fontSize: 11, color: "#555", marginBottom: 3 }}>{carrito.map(i => `${i.icon || ''} ${i.label || i.nombre}${i.cantidad > 1 ? ` ×${i.cantidad}` : ''}`).join('  ·  ')}</div>
-              <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 22, fontWeight: 800, color: "#fff" }}>${total.toLocaleString("es-AR")}</div>
-            </div>
+            <div style={{ padding: "18px 22px", display: "flex", flexDirection: "column", gap: 18 }}>
 
-            {/* Forma de cobro — afecta precio de productos */}
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>Forma de cobro</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <button onClick={() => setEsEfectivo(true)}
-                  style={{ padding: "11px", border: `2px solid ${esEfectivo ? "#16a34a" : "#222"}`, borderRadius: 9, background: esEfectivo ? "#16a34a22" : "#1a1a1a", color: esEfectivo ? "#4ade80" : "#555", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                  💵 Efectivo
-                </button>
-                <button onClick={() => setEsEfectivo(false)}
-                  style={{ padding: "11px", border: `2px solid ${!esEfectivo ? "#3b82f6" : "#222"}`, borderRadius: 9, background: !esEfectivo ? "#0f1f40" : "#1a1a1a", color: !esEfectivo ? "#93c5fd" : "#555", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                  💳 Otro
-                </button>
+              {/* Resumen orden */}
+              <div style={{ background: "#1a1a1a", borderRadius: 12, padding: "12px 16px", borderLeft: "3px solid #2563eb" }}>
+                <div style={{ fontSize: 12, color: "#555", marginBottom: 4, lineHeight: 1.5 }}>
+                  {carrito.map(i => `${i.icon || ''} ${i.label || i.nombre}${i.cantidad > 1 ? ` ×${i.cantidad}` : ''}`).join('  ·  ')}
+                </div>
+                <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 28, fontWeight: 800, color: "#fff" }}>
+                  ${total.toLocaleString("es-AR")}
+                </div>
               </div>
-            </div>
 
-            {/* Patente */}
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, textTransform: "uppercase", marginBottom: 5 }}>Patente</div>
-              <input type="text" placeholder="ABC 123" value={patente} onChange={e => setPatente(e.target.value.toUpperCase())} autoFocus
-                style={{ width: "100%", background: "#0d1b33", border: "2px solid #3b82f655", borderRadius: 10, padding: "11px 14px", color: "#93c5fd", fontSize: 22, fontWeight: 800, letterSpacing: 4, textAlign: "center", outline: "none", fontFamily: "'Barlow Condensed',sans-serif" }} />
-            </div>
-
-            {/* Marca y Modelo */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+              {/* Forma de cobro */}
               <div>
-                <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, textTransform: "uppercase", marginBottom: 5 }}>Marca</div>
-                <input type="text" placeholder="Ford" value={marca} onChange={e => setMarca(e.target.value)}
-                  style={{ width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 8, padding: "9px 10px", color: "#ccc", fontSize: 14, outline: "none" }} />
+                <div style={{ fontSize: 11, color: "#555", letterSpacing: 3, textTransform: "uppercase", marginBottom: 10 }}>Forma de cobro</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <button onClick={() => setEsEfectivo(true)} className="ac-btn"
+                    style={{ padding: "18px", border: `2px solid ${esEfectivo ? "#16a34a" : "#222"}`, borderRadius: 14, background: esEfectivo ? "#16a34a22" : "#1a1a1a", color: esEfectivo ? "#4ade80" : "#555", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 19, fontWeight: 800, cursor: "pointer", transition: "all 0.15s" }}>
+                    💵 EFECTIVO
+                  </button>
+                  <button onClick={() => setEsEfectivo(false)} className="ac-btn"
+                    style={{ padding: "18px", border: `2px solid ${!esEfectivo ? "#3b82f6" : "#222"}`, borderRadius: 14, background: !esEfectivo ? "#0f1f40" : "#1a1a1a", color: !esEfectivo ? "#93c5fd" : "#555", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 19, fontWeight: 800, cursor: "pointer", transition: "all 0.15s" }}>
+                    💳 OTRO
+                  </button>
+                </div>
               </div>
+
+              {/* Patente con autocomplete */}
               <div>
-                <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, textTransform: "uppercase", marginBottom: 5 }}>Modelo</div>
-                <input type="text" placeholder="Focus" value={modelo} onChange={e => setModelo(e.target.value)}
-                  style={{ width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 8, padding: "9px 10px", color: "#ccc", fontSize: 14, outline: "none" }} />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: "#555", letterSpacing: 3, textTransform: "uppercase" }}>Patente</div>
+                  <div style={{ fontSize: 11, color: "#2a2a2a", fontStyle: "italic" }}>opcional</div>
+                </div>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="text"
+                    placeholder="ABC 123"
+                    value={patente}
+                    onChange={e => setPatente(e.target.value.toUpperCase())}
+                    autoFocus
+                    style={{ width: "100%", background: "#0d1b33", border: `2px solid ${patente.length >= 3 ? "#3b82f6" : "#3b82f633"}`, borderRadius: 14, padding: "18px 20px", color: "#93c5fd", fontSize: 36, fontWeight: 800, letterSpacing: 6, textAlign: "center", outline: "none", fontFamily: "'Barlow Condensed',sans-serif", transition: "border-color 0.2s" }}
+                  />
+                  {buscandoCliente && (
+                    <div style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", width: 18, height: 18, border: "2px solid #3b82f633", borderTopColor: "#3b82f6", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+                  )}
+                </div>
+
+                {/* Sugerencia autocomplete */}
+                {autocompleteResult && (
+                  <div style={{ marginTop: 10, background: "#0a1628", border: "1px solid #3b82f640", borderRadius: 14, padding: "14px 16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 11, color: "#3b82f6", letterSpacing: 1, marginBottom: 5 }}>🚗 Cliente anterior encontrado</div>
+                        {(autocompleteResult.marca || autocompleteResult.modelo) && (
+                          <div style={{ fontSize: 17, fontWeight: 700, color: "#fff", marginBottom: 2 }}>
+                            {[autocompleteResult.marca, autocompleteResult.modelo].filter(Boolean).join(' ')}
+                          </div>
+                        )}
+                        {autocompleteResult.cliente && <div style={{ fontSize: 14, color: "#888" }}>{autocompleteResult.cliente}</div>}
+                        {autocompleteResult.telefono && <div style={{ fontSize: 12, color: "#555" }}>{autocompleteResult.telefono}</div>}
+                      </div>
+                      <button onClick={aplicarAutocomplete} className="ac-btn"
+                        style={{ background: "#3b82f6", border: "none", borderRadius: 12, padding: "12px 16px", color: "#fff", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 14, fontWeight: 800, cursor: "pointer", flexShrink: 0, letterSpacing: 0.5, transition: "all 0.15s" }}>
+                        USAR ✓
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
 
-            {/* Cliente opcional */}
-            <div style={{ borderTop: "1px solid #1e1e1e", paddingTop: 12, marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: "#444", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>Cliente (opcional)</div>
-              <input type="text" placeholder="Nombre" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)}
-                style={{ width: "100%", background: "#1a1a1a", border: "1px solid #1e1e1e", borderRadius: 8, padding: "9px 10px", color: "#ccc", fontSize: 13, outline: "none", marginBottom: 7, fontFamily: "'Barlow',sans-serif" }} />
-              <input type="tel" placeholder="Teléfono" value={telefono} onChange={e => setTelefono(e.target.value)}
-                style={{ width: "100%", background: "#1a1a1a", border: "1px solid #1e1e1e", borderRadius: 8, padding: "9px 10px", color: "#ccc", fontSize: 13, outline: "none", fontFamily: "'Barlow',sans-serif" }} />
-            </div>
+              {/* Datos del cliente — colapsable */}
+              <div style={{ borderTop: "1px solid #1a1a1a", paddingTop: 16 }}>
+                <button
+                  onClick={() => setDatosExpandidos(s => !s)}
+                  className="toggle-datos"
+                  style={{ background: "none", border: "1px solid #222", borderRadius: 12, padding: "14px 16px", color: datosExpandidos ? "#ccc" : "#555", width: "100%", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 15, fontWeight: 700, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", transition: "all 0.2s" }}
+                >
+                  <span style={{ letterSpacing: 0.5 }}>
+                    {datosExpandidos ? "▾" : "▸"} Datos del cliente
+                    <span style={{ fontSize: 11, color: "#333", marginLeft: 8, fontWeight: 400 }}>opcional</span>
+                  </span>
+                  {(marca || modelo || clienteNombre || telefono) && (
+                    <span style={{ background: "#1e1e1e", color: "#666", borderRadius: 20, padding: "3px 10px", fontSize: 11, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {[marca, modelo, clienteNombre].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                </button>
 
-            {/* Botones */}
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setShowModal(false)}
-                style={{ flex: 1, padding: "13px", background: "transparent", border: "1px solid #2a2a2a", borderRadius: 10, color: "#555", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
-                Cancelar
-              </button>
-              <button onClick={enviarACaja}
-                style={{ flex: 2, padding: "13px", background: "#2563eb", border: "none", borderRadius: 10, color: "#fff", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 17, fontWeight: 800, letterSpacing: 1, cursor: "pointer" }}>
-                📤 ENVIAR A CAJA
-              </button>
+                {datosExpandidos && (
+                  <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 11, color: "#444", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Marca</div>
+                        <input type="text" placeholder="Ford" value={marca} onChange={e => setMarca(e.target.value)}
+                          style={{ width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 10, padding: "14px", color: "#ccc", fontSize: 16, outline: "none", minHeight: 52 }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, color: "#444", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Modelo</div>
+                        <input type="text" placeholder="Focus" value={modelo} onChange={e => setModelo(e.target.value)}
+                          style={{ width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 10, padding: "14px", color: "#ccc", fontSize: 16, outline: "none", minHeight: 52 }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#444", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Nombre del cliente</div>
+                      <input type="text" placeholder="Juan García" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)}
+                        style={{ width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 10, padding: "14px", color: "#ccc", fontSize: 16, outline: "none", minHeight: 52 }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#444", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Teléfono</div>
+                      <input type="tel" placeholder="3516 000000" value={telefono} onChange={e => setTelefono(e.target.value)}
+                        style={{ width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 10, padding: "14px", color: "#ccc", fontSize: 16, outline: "none", minHeight: 52 }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Botones */}
+              <div style={{ display: "flex", gap: 10, paddingBottom: 4 }}>
+                <button onClick={() => setShowModal(false)}
+                  style={{ flex: 1, padding: "17px", background: "transparent", border: "1px solid #2a2a2a", borderRadius: 14, color: "#555", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
+                  Cancelar
+                </button>
+                <button onClick={enviarACaja} className="ac-btn"
+                  style={{ flex: 2, padding: "17px", background: "#2563eb", border: "none", borderRadius: 14, color: "#fff", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 21, fontWeight: 800, letterSpacing: 1, cursor: "pointer", transition: "all 0.15s" }}>
+                  📤 ENVIAR A CAJA
+                </button>
+              </div>
             </div>
           </div>
         </div>
