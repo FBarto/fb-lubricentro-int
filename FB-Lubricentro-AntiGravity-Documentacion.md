@@ -96,20 +96,25 @@ El sistema fue diseñado con una arquitectura progresiva: arranca simple (Sheets
 ```
 fb-lubricentro/
 ├── lib/
-│   └── sheets.js              # Cliente Google Sheets + helpers (getRows, appendRow, updateRowWhere)
+│   ├── sheets.js              # Cliente Google Sheets + helpers (getRows, appendRow, updateRowWhere)
+│   └── auth.js                # Sistema de autenticación: usuarios, sesión por jornada, validación
+├── components/
+│   ├── LoginScreen.js         # Pantalla de login reutilizable (con soporte de ícono por pantalla)
+│   └── AuthGuard.js           # HOC de protección + React Context (provee sesion y onCambiarUsuario)
 ├── pages/
 │   ├── _app.js                # Wrapper global de React
 │   ├── _document.js           # HTML base — carga Google Fonts globalmente
 │   ├── index.js               # Pantalla de inicio (selector de módulo: Gomería / Caja / Dashboard)
-│   ├── gomeria.js             # UI de la tablet del gomero
-│   ├── caja.js                # UI de la PC de caja
-│   ├── importar.js            # Importador de listas de proveedores
-│   ├── dashboard.js           # Dashboard de métricas (requiere login)
+│   ├── gomeria.js             # UI de la tablet del gomero (pública, sin login)
+│   ├── caja.js                # UI de la PC de caja (protegida con AuthGuard)
+│   ├── importar.js            # Importador de listas de proveedores (protegido con AuthGuard)
+│   ├── dashboard.js           # Dashboard de métricas (protegido con AuthGuard)
 │   └── api/
 │       ├── gomeria/
 │       │   ├── orden.js       # POST: crea orden desde gomería
 │       │   ├── servicios.js   # GET: lista servicios desde Sheet
 │       │   ├── productos.js   # GET: lista productos con stock
+│       │   ├── cliente.js     # GET: busca cliente por patente (autocomplete)
 │       │   └── stock/
 │       │       └── [id].js    # POST: descuenta stock al vender
 │       ├── caja/
@@ -368,6 +373,8 @@ Crear `.env.local` en la raíz con las mismas variables. Este archivo está en `
 
 - [x] **Dashboard de métricas** *(Sprint 2)* — ventas del día/semana/mes, formas de pago, franja horaria, top servicios, alertas de stock
 - [x] **Login para dashboard** *(Sprint 2)* — usuario/contraseña hardcodeado, sesión en sessionStorage
+- [x] **Base de datos de clientes por patente** *(Sprint 3)* — autocomplete en gomería al tipear la patente
+- [x] **Autenticación completa** *(Sprint 4)* — protege /caja, /importar y /dashboard con login unificado, sesión por jornada laboral
 - [ ] **Autenticación completa** — proteger `/caja` y `/importar`, migrar a NextAuth o similar
 - [ ] **Módulo completo de lubricentro** — catálogo de productos con búsqueda avanzada
 - [ ] **Base de datos de clientes por patente** — historial de atenciones por vehículo
@@ -396,7 +403,43 @@ Repositorio, credenciales y accesos en poder del cliente.
 
 ---
 
-## 18. Login del dashboard
+## 18. Autenticación — Sprint 4
+
+### Páginas protegidas
+
+| Pantalla | Login requerido | Notas |
+|---|---|---|
+| `/gomeria` | ❌ No | Pública, uso en tablet |
+| `/caja` | ✅ Sí | Login unificado |
+| `/importar` | ✅ Sí | Login unificado |
+| `/dashboard` | ✅ Sí | Login unificado |
+
+### Credenciales
+
+| Campo | Valor |
+|---|---|
+| Usuario | `admin` |
+| Contraseña | `fb2026` |
+| Implementación | Hardcodeado en `lib/auth.js` (array `USUARIOS`) |
+| Sesión | `localStorage` con clave del día — expira a la hora definida en `HORA_CIERRE` |
+| Hora de cierre | `20` (20:00 hs) — configurable en `lib/auth.js` |
+
+> Para cambiar la hora de cierre: editar `HORA_CIERRE` en `lib/auth.js` y hacer push a `main`.
+
+> Para agregar un usuario: agregar una línea al array `USUARIOS` en `lib/auth.js` con `{ usuario, password, nombre }`.
+
+### Cambio de usuario
+Desde el header de `/caja`, `/importar` o `/dashboard` hay un botón **CAMBIAR** que limpia la sesión y muestra el login sin redirigir. Útil para cambio de turno sin cerrar el browser.
+
+### Funcionamiento de la sesión
+- La clave de `localStorage` incluye la fecha del día (ej: `fb_auth_27/05/2026`).
+- Esto garantiza que no haya sesiones de un día para el otro automáticamente.
+- La sesión expira a las `HORA_CIERRE:00 hs` del día en que se logueó.
+- Si el browser se cierra y se reabre el mismo día antes de `HORA_CIERRE`, la sesión se restaura.
+
+---
+
+## 19. Login del dashboard *(reemplazado por Sprint 4)*
 
 | Campo | Valor |
 |---|---|
@@ -430,4 +473,5 @@ Devuelve en un solo llamado:
 
 ---
 
-*Documentación actualizada: Sprint 2 — 25/05/2026*
+*Documentación actualizada: Sprint 4 — 27/05/2026*
+

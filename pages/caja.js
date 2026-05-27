@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import AuthGuard, { useAuth } from "../components/AuthGuard";
+
 
 const CATEGORIAS = ["Todos", "Aceites", "Filtros", "Baterías", "Aditivos", "Lubricantes"];
 
@@ -15,7 +17,17 @@ const MARKETING = ["Google Ads", "Facebook", "Recomendación", "Paso por la call
 const fmt = (n) => '$' + Number(n || 0).toLocaleString('es-AR');
 const totalOrden = (items) => (items || []).reduce((s, i) => s + Number(i.precio) * Number(i.cantidad), 0);
 
-export default function Caja() {
+export default function CajaPage() {
+  return (
+    <AuthGuard pantalla="Caja">
+      <CajaContent />
+    </AuthGuard>
+  );
+}
+
+function CajaContent() {
+  const { sesion, onCambiarUsuario } = useAuth();
+
   const [tab, setTab] = useState("pendientes");
   const [pendientes, setPendientes] = useState([]);
   const [historial, setHistorial] = useState([]);
@@ -194,11 +206,28 @@ export default function Caja() {
             ))}
           </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 11, color: "#444" }}>{new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}</div>
-          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 20, fontWeight: 700, color: "#fff" }}>{new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 11, color: "#444" }}>{new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}</div>
+            <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 20, fontWeight: 700, color: "#fff" }}>{new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</div>
+          </div>
+          <div style={{ width: 1, height: 32, background: "#222" }} />
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 9, color: "#444", letterSpacing: 2, textTransform: "uppercase" }}>Usuario</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc" }}>👤 {sesion?.nombre}</div>
+          </div>
+          <button
+            onClick={onCambiarUsuario}
+            title="Cambiar de usuario"
+            style={{ background: "#111", border: "1px solid #222", borderRadius: 8, padding: "7px 13px", color: "#555", fontSize: 11, fontWeight: 600, letterSpacing: 1, cursor: "pointer", transition: "all 0.15s" }}
+            onMouseOver={e => { e.currentTarget.style.borderColor='#444'; e.currentTarget.style.color='#aaa'; }}
+            onMouseOut={e => { e.currentTarget.style.borderColor='#222'; e.currentTarget.style.color='#555'; }}
+          >
+            CAMBIAR
+          </button>
         </div>
       </div>
+
 
       {/* Tab Pendientes */}
       {tab === "pendientes" && (

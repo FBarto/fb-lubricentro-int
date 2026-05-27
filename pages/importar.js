@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import * as XLSX from "xlsx";
+import AuthGuard, { useAuth } from "../components/AuthGuard";
+
 
 const CAMPOS_DESTINO = [
   { id: "codigo", label: "Código", requerido: false },
@@ -10,7 +12,17 @@ const CAMPOS_DESTINO = [
   { id: "ignorar", label: "— Ignorar columna —", requerido: false },
 ];
 
-export default function Importador() {
+export default function ImportadorPage() {
+  return (
+    <AuthGuard pantalla="Importador">
+      <ImportadorContent />
+    </AuthGuard>
+  );
+}
+
+function ImportadorContent() {
+  const { sesion, onCambiarUsuario } = useAuth();
+
   const [paso, setPaso] = useState(1); // 1=subir, 2=mapear, 3=preview, 4=listo
   const [archivo, setArchivo] = useState(null);
   const [columnas, setColumnas] = useState([]);
@@ -150,8 +162,25 @@ export default function Importador() {
             <div style={{ fontSize: 10, color: "#444", letterSpacing: 3 }}>IMPORTADOR DE PRODUCTOS · ANTIGRAVITY</div>
           </div>
         </div>
-        <a href="/caja" style={{ fontSize: 12, color: "#555", textDecoration: "none", border: "1px solid #222", padding: "5px 12px", borderRadius: 6 }}>← Volver a Caja</a>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <a href="/caja" style={{ fontSize: 12, color: "#555", textDecoration: "none", border: "1px solid #222", padding: "5px 12px", borderRadius: 6 }}>← Volver a Caja</a>
+          <div style={{ width: 1, height: 24, background: "#222" }} />
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 9, color: "#444", letterSpacing: 2, textTransform: "uppercase" }}>Usuario</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#ccc" }}>👤 {sesion?.nombre}</div>
+          </div>
+          <button
+            onClick={onCambiarUsuario}
+            title="Cambiar de usuario"
+            style={{ background: "#111", border: "1px solid #222", borderRadius: 7, padding: "6px 12px", color: "#555", fontSize: 11, fontWeight: 600, letterSpacing: 1, cursor: "pointer", transition: "all 0.15s" }}
+            onMouseOver={e => { e.currentTarget.style.borderColor='#444'; e.currentTarget.style.color='#aaa'; }}
+            onMouseOut={e => { e.currentTarget.style.borderColor='#222'; e.currentTarget.style.color='#555'; }}
+          >
+            CAMBIAR
+          </button>
+        </div>
       </div>
+
 
       <div style={{ maxWidth: 780, margin: "0 auto", padding: "32px 24px" }}>
 

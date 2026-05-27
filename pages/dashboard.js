@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
+import AuthGuard, { useAuth } from '../components/AuthGuard';
 
-const USUARIO = 'admin';
-const PASSWORD = 'fb2026';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -225,126 +224,15 @@ function StockAlerts({ alertasStock }) {
   );
 }
 
-// ─── Login Screen ────────────────────────────────────────────────────────────
+// ─── Dashboard Pages ──────────────────────────────────────────────────────────
 
-function LoginScreen({ onLogin, error }) {
-  const [user, setUser] = useState('');
-  const [pass, setPass] = useState('');
-  const [showPass, setShowPass] = useState(false);
-
+export default function DashboardPage() {
   return (
-    <div style={{
-      minHeight: '100vh', background: '#0a0a0a',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: "'Barlow Condensed', Arial, sans-serif",
-    }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&display=swap');
-        *, *::before, *::after { box-sizing: border-box; }
-        input { outline: none; transition: border-color 0.2s; }
-        input:focus { border-color: #1d4ed8 !important; }
-        .login-btn:hover { background: #2563eb !important; transform: translateY(-1px); }
-        .login-btn:active { transform: translateY(0); }
-      `}</style>
-
-      <div style={{
-        background: 'linear-gradient(145deg, #141414, #0f0f0f)',
-        border: '1px solid #1e1e1e', borderRadius: 24,
-        padding: '52px 44px', width: '100%', maxWidth: 420,
-        display: 'flex', flexDirection: 'column', gap: 32,
-        boxShadow: '0 30px 100px #00000080, 0 0 0 1px #ffffff05',
-      }}>
-        {/* Logo */}
-        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontSize: 48 }}>📊</div>
-          <div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: 3 }}>
-              FB LUBRICENTRO
-            </div>
-            <div style={{ fontSize: 11, color: '#333', letterSpacing: 5, textTransform: 'uppercase', marginTop: 4 }}>
-              Dashboard de métricas
-            </div>
-          </div>
-        </div>
-
-        {/* Form */}
-        <form
-          onSubmit={(e) => { e.preventDefault(); onLogin(user, pass); }}
-          style={{ display: 'flex', flexDirection: 'column', gap: 18 }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <label style={{ fontSize: 11, color: '#444', letterSpacing: 3, textTransform: 'uppercase' }}>
-              Usuario
-            </label>
-            <input
-              value={user} onChange={(e) => setUser(e.target.value)}
-              autoComplete="username" autoFocus
-              style={{
-                background: '#0c0c0c', border: '1px solid #222', borderRadius: 12,
-                padding: '13px 16px', color: '#fff', fontSize: 15,
-                fontFamily: 'inherit', width: '100%',
-              }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <label style={{ fontSize: 11, color: '#444', letterSpacing: 3, textTransform: 'uppercase' }}>
-              Contraseña
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showPass ? 'text' : 'password'}
-                value={pass} onChange={(e) => setPass(e.target.value)}
-                autoComplete="current-password"
-                style={{
-                  background: '#0c0c0c', border: '1px solid #222', borderRadius: 12,
-                  padding: '13px 46px 13px 16px', color: '#fff', fontSize: 15,
-                  fontFamily: 'inherit', width: '100%',
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPass((s) => !s)}
-                style={{
-                  position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                  background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: '#444',
-                  padding: 4,
-                }}
-              >
-                {showPass ? '🙈' : '👁️'}
-              </button>
-            </div>
-          </div>
-
-          {error && (
-            <div style={{
-              background: '#ef444415', border: '1px solid #ef444435',
-              borderRadius: 10, padding: '11px 16px', color: '#ef4444',
-              fontSize: 13, textAlign: 'center',
-            }}>
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className="login-btn"
-            style={{
-              background: '#1d4ed8', border: 'none', borderRadius: 12,
-              padding: '15px', color: '#fff', fontSize: 16, fontWeight: 800,
-              cursor: 'pointer', letterSpacing: 2, fontFamily: 'inherit',
-              marginTop: 4, transition: 'all 0.2s',
-            }}
-          >
-            ACCEDER
-          </button>
-        </form>
-      </div>
-    </div>
+    <AuthGuard pantalla="Dashboard">
+      <Dashboard />
+    </AuthGuard>
   );
 }
-
-// ─── Dashboard Main ──────────────────────────────────────────────────────────
 
 const TABS = [
   { id: 'hoy',    label: 'HOY' },
@@ -353,11 +241,9 @@ const TABS = [
   { id: 'custom', label: 'PERSONALIZADO' },
 ];
 
-export default function Dashboard() {
+function Dashboard() {
   const router = useRouter();
-  const [authed, setAuthed]     = useState(false);
-  const [checking, setChecking] = useState(true);
-  const [loginError, setLoginError] = useState('');
+  const { sesion, onCambiarUsuario } = useAuth();
 
   const [periodo, setPeriodo]       = useState('hoy');
   const [desdeInput, setDesdeInput] = useState('');
@@ -367,30 +253,8 @@ export default function Dashboard() {
   const [loading, setLoading]   = useState(false);
   const [fetchError, setFetchError] = useState('');
 
-  useEffect(() => {
-    try {
-      if (sessionStorage.getItem('fb_dashboard_auth') === 'ok') setAuthed(true);
-    } catch {}
-    setChecking(false);
-  }, []);
-
-  function handleLogin(user, pass) {
-    if (user.trim() === USUARIO && pass === PASSWORD) {
-      try { sessionStorage.setItem('fb_dashboard_auth', 'ok'); } catch {}
-      setAuthed(true);
-      setLoginError('');
-    } else {
-      setLoginError('Usuario o contraseña incorrectos');
-    }
-  }
-
-  function handleLogout() {
-    try { sessionStorage.removeItem('fb_dashboard_auth'); } catch {}
-    setAuthed(false);
-    setData(null);
-  }
-
   const fetchData = useCallback(async (desde, hasta, modo) => {
+
     if (!desde || !hasta) return;
     setLoading(true);
     setFetchError('');
@@ -407,12 +271,13 @@ export default function Dashboard() {
     }
   }, []);
 
-  // Fetch on auth + period change (except custom)
+  // Fetch on period change
   useEffect(() => {
-    if (!authed || periodo === 'custom') return;
+    if (periodo === 'custom') return;
     const dates = getPeriodoDates(periodo);
     if (dates) fetchData(dates.desde, dates.hasta, dates.modo);
-  }, [authed, periodo, fetchData]);
+  }, [periodo, fetchData]);
+
 
   function handleCustomSearch() {
     if (!desdeInput || !hastaInput) return;
@@ -427,9 +292,6 @@ export default function Dashboard() {
       if (dates) fetchData(dates.desde, dates.hasta, dates.modo);
     }
   }
-
-  if (checking) return null;
-  if (!authed) return <LoginScreen onLogin={handleLogin} error={loginError} />;
 
   const m  = data?.metricas;
   const ma = data?.metricasAnterior;
@@ -478,7 +340,11 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ textAlign: 'right', marginRight: 4 }}>
+            <div style={{ fontSize: 9, color: '#444', letterSpacing: 2, textTransform: 'uppercase' }}>Usuario</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#ccc' }}>👤 {sesion?.nombre}</div>
+          </div>
           <button
             onClick={handleRefresh}
             className="icon-btn"
@@ -503,7 +369,7 @@ export default function Dashboard() {
             ← INICIO
           </button>
           <button
-            onClick={handleLogout}
+            onClick={onCambiarUsuario}
             className="salir-btn"
             style={{
               background: 'none', border: '1px solid #1e1e1e', borderRadius: 9,
@@ -514,6 +380,7 @@ export default function Dashboard() {
             SALIR
           </button>
         </div>
+
       </header>
 
       {/* ── Main ── */}
