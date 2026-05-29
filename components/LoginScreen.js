@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { HORA_CIERRE, getUsuariosParaLogin } from '../lib/auth';
+import { useState, useEffect } from 'react';
+import { HORA_CIERRE } from '../lib/auth';
 
 // Genera iniciales y color de avatar a partir del nombre
 function getAvatar(nombre) {
@@ -22,18 +22,29 @@ function getAvatar(nombre) {
 }
 
 const PANTALLA_CONFIG = {
-  Caja:       { icon: '🏧', sub: 'Panel de cobros y ventas' },
-  Importador: { icon: '📂', sub: 'Importador de proveedores' },
-  Dashboard:  { icon: '📊', sub: 'Dashboard de métricas' },
+  Caja:           { icon: '🏧', sub: 'Panel de cobros y ventas' },
+  Importador:     { icon: '📂', sub: 'Importador de proveedores' },
+  Dashboard:      { icon: '📊', sub: 'Dashboard de métricas' },
+  Admin:          { icon: '⚙️', sub: 'Panel de administración' },
 };
 
-export default function LoginScreen({ pantalla = 'Sistema', onLogin, error }) {
-  const usuarios = getUsuariosParaLogin();
+export default function LoginScreen({ pantalla = 'Sistema', onLogin, error, loginando = false }) {
+  const [usuarios, setUsuarios]     = useState([]);
+  const [cargando, setCargando]     = useState(true);
   const [usuarioSel, setUsuarioSel] = useState(null);
   const [password, setPassword]     = useState('');
   const [showPass, setShowPass]     = useState(false);
 
   const cfg = PANTALLA_CONFIG[pantalla] || { icon: '🔒', sub: pantalla };
+
+  // Cargar lista de usuarios desde la API (sin contraseñas)
+  useEffect(() => {
+    fetch('/api/admin/usuarios/lista')
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => setUsuarios(data))
+      .catch(() => setUsuarios([]))
+      .finally(() => setCargando(false));
+  }, []);
 
   function seleccionar(u) {
     setUsuarioSel(u);
@@ -48,7 +59,7 @@ export default function LoginScreen({ pantalla = 'Sistema', onLogin, error }) {
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (usuarioSel) onLogin(usuarioSel.usuario, password);
+    if (usuarioSel && !loginando) onLogin(usuarioSel.usuario, password);
   }
 
   return (
@@ -87,6 +98,8 @@ export default function LoginScreen({ pantalla = 'Sistema', onLogin, error }) {
         .slide-up { animation: slideUp 0.22s ease-out; }
         @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
         .shake { animation: shake 0.3s ease-out; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spin { animation: spin 0.8s linear infinite; display: inline-block; }
       `}</style>
 
       <div style={{
@@ -113,70 +126,84 @@ export default function LoginScreen({ pantalla = 'Sistema', onLogin, error }) {
           </div>
         </div>
 
+        {/* Cargando usuarios */}
+        {cargando && (
+          <div style={{ textAlign: 'center', color: '#333', fontSize: 13 }}>
+            <span className="spin">⟳</span> Cargando usuarios...
+          </div>
+        )}
+
         {/* ── PASO 1: Selección de usuario ── */}
-        {!usuarioSel && (
+        {!cargando && !usuarioSel && (
           <div className="slide-up">
             <div style={{ fontSize: 11, color: '#444', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 14, textAlign: 'center' }}>
               Seleccioná tu usuario
             </div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: usuarios.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(120px, 1fr))',
-              gap: 12,
-            }}>
-              {usuarios.map((u) => {
-                const av = getAvatar(u.nombre);
-                return (
-                  <button
-                    key={u.usuario}
-                    className="user-card"
-                    onClick={() => seleccionar(u)}
-                    style={{
-                      background: '#0f0f0f',
-                      border: '2px solid #1e1e1e',
-                      borderRadius: 16,
-                      padding: '22px 16px 18px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: 12,
-                    }}
-                  >
-                    {/* Avatar */}
-                    <div style={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: '50%',
-                      background: av.bg,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 24,
-                      fontWeight: 800,
-                      color: av.light,
-                      letterSpacing: 1,
-                      boxShadow: `0 4px 16px ${av.bg}66`,
-                      flexShrink: 0,
-                    }}>
-                      {av.initials}
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: '#ddd', letterSpacing: 0.5 }}>
-                        {u.nombre}
+            {usuarios.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#444', fontSize: 13, padding: '20px 0' }}>
+                No hay usuarios configurados.<br />
+                <span style={{ fontSize: 11, color: '#333' }}>Verificá la pestaña "usuarios" en el Sheet.</span>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: usuarios.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(120px, 1fr))',
+                gap: 12,
+              }}>
+                {usuarios.map((u) => {
+                  const av = getAvatar(u.nombre);
+                  return (
+                    <button
+                      key={u.usuario}
+                      className="user-card"
+                      onClick={() => seleccionar(u)}
+                      style={{
+                        background: '#0f0f0f',
+                        border: '2px solid #1e1e1e',
+                        borderRadius: 16,
+                        padding: '22px 16px 18px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 12,
+                      }}
+                    >
+                      {/* Avatar */}
+                      <div style={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: '50%',
+                        background: av.bg,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 24,
+                        fontWeight: 800,
+                        color: av.light,
+                        letterSpacing: 1,
+                        boxShadow: `0 4px 16px ${av.bg}66`,
+                        flexShrink: 0,
+                      }}>
+                        {av.initials}
                       </div>
-                      <div style={{ fontSize: 11, color: '#444', marginTop: 2, letterSpacing: 1 }}>
-                        @{u.usuario}
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: '#ddd', letterSpacing: 0.5 }}>
+                          {u.nombre}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#444', marginTop: 2, letterSpacing: 1 }}>
+                          @{u.usuario}
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
         {/* ── PASO 2: Contraseña del usuario seleccionado ── */}
-        {usuarioSel && (() => {
+        {!cargando && usuarioSel && (() => {
           const av = getAvatar(usuarioSel.nombre);
           return (
             <form className="slide-up" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -237,6 +264,7 @@ export default function LoginScreen({ pantalla = 'Sistema', onLogin, error }) {
                     autoComplete="current-password"
                     autoFocus
                     placeholder="••••••••"
+                    disabled={loginando}
                     style={{
                       background: '#0c0c0c',
                       border: '1px solid #222',
@@ -247,6 +275,7 @@ export default function LoginScreen({ pantalla = 'Sistema', onLogin, error }) {
                       width: '100%',
                       letterSpacing: 2,
                       transition: 'border-color 0.2s, box-shadow 0.2s',
+                      opacity: loginando ? 0.5 : 1,
                     }}
                   />
                   <button
@@ -291,23 +320,27 @@ export default function LoginScreen({ pantalla = 'Sistema', onLogin, error }) {
               <button
                 id="login-submit"
                 type="submit"
-                disabled={!password}
+                disabled={!password || loginando}
                 className="login-btn"
                 style={{
-                  background: !password ? '#1a1a1a' : '#1d4ed8',
+                  background: (!password || loginando) ? '#1a1a1a' : '#1d4ed8',
                   border: 'none',
                   borderRadius: 12,
                   padding: '15px',
-                  color: !password ? '#333' : '#fff',
+                  color: (!password || loginando) ? '#333' : '#fff',
                   fontSize: 16,
                   fontWeight: 800,
-                  cursor: !password ? 'not-allowed' : 'pointer',
+                  cursor: (!password || loginando) ? 'not-allowed' : 'pointer',
                   letterSpacing: 2,
                   fontFamily: 'inherit',
                   marginTop: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
                 }}
               >
-                ACCEDER
+                {loginando ? <><span className="spin">⟳</span> VERIFICANDO...</> : 'ACCEDER'}
               </button>
             </form>
           );

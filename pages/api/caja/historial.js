@@ -8,10 +8,11 @@ export default async function handler(req, res) {
     const ventas = await getRows(sheets, 'ventas');
     const items = await getRows(sheets, 'venta_items');
 
-    const hoy = new Date().toLocaleDateString('es-AR');
+    // Si se pasa ?fecha=DD/MM/AAAA se filtra por esa fecha; si no, por hoy
+    const fechaFiltro = req.query.fecha || new Date().toLocaleDateString('es-AR');
 
     const cobradas = ventas
-      .filter((v) => v.estado === 'cobrado' && v.fecha === hoy)
+      .filter((v) => v.estado === 'cobrado' && v.fecha === fechaFiltro)
       .map((v) => ({
         id: v.id,
         fecha: v.fecha,
@@ -36,7 +37,7 @@ export default async function handler(req, res) {
           })),
       }));
 
-    // Métricas del día
+    // Métricas del período filtrado
     const totalDia = cobradas.reduce((s, v) => s + v.total, 0);
 
     const porFormaPago = {
@@ -60,6 +61,7 @@ export default async function handler(req, res) {
     });
 
     res.status(200).json({
+      fecha: fechaFiltro,
       ventas: cobradas,
       metricas: {
         total_dia: totalDia,

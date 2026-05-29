@@ -33,6 +33,7 @@ function CajaContent() {
   const [historial, setHistorial] = useState([]);
   const [metricas, setMetricas] = useState(null);
   const [cargandoHistorial, setCargandoHistorial] = useState(true);
+  const [fechaHistorial, setFechaHistorial] = useState(() => new Date().toISOString().slice(0, 10)); // YYYY-MM-DD para el input
   const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
   const [formaPago, setFormaPago] = useState("");
   const [clienteCobro, setClienteCobro] = useState("");
@@ -49,9 +50,15 @@ function CajaContent() {
   const [cargando, setCargando] = useState(false);
 
   // Cargar historial persistente desde Sheets
-  const fetchHistorial = useCallback(async () => {
+  // Acepta una fecha en formato YYYY-MM-DD (del input date) y la convierte a DD/MM/AAAA para la API
+  const fetchHistorial = useCallback(async (fechaISO) => {
+    setCargandoHistorial(true);
     try {
-      const res = await fetch('/api/caja/historial');
+      const fechaParam = fechaISO
+        ? fechaISO.split('-').reverse().join('/') // YYYY-MM-DD → DD/MM/AAAA
+        : undefined;
+      const url = fechaParam ? `/api/caja/historial?fecha=${encodeURIComponent(fechaParam)}` : '/api/caja/historial';
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setHistorial(data.ventas || []);
@@ -80,7 +87,7 @@ function CajaContent() {
 
   useEffect(() => {
     fetchPendientes();
-    fetchHistorial();
+    fetchHistorial(fechaHistorial);
     const interval = setInterval(fetchPendientes, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -115,7 +122,7 @@ function CajaContent() {
         setPendientes((prev) => prev.filter((o) => o.id !== ordenSeleccionada.id));
         setOrdenSeleccionada(null);
         setFormaPago(""); setClienteCobro(""); setMarketing("");
-        await fetchHistorial(); // Refrescar historial y métricas
+        await fetchHistorial(fechaHistorial); // Refrescar historial y métricas
       }
     } finally {
       setCobrandoId(null);
@@ -152,7 +159,7 @@ function CajaContent() {
       });
       if (res.ok) {
         setVentaExitosa(true);
-        await fetchHistorial();
+        await fetchHistorial(fechaHistorial);
         setTimeout(() => {
           setVentaExitosa(false);
           setCarritoLocal([]); setClienteLocal(""); setMarketingLocal(""); setFormaPagoLocal("");
@@ -523,9 +530,38 @@ function CajaContent() {
               </div>
             )}
 
-            {/* Lista de ventas del día */}
-            <div style={{ fontSize: 11, color: "#444", letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>{historial.length} ventas cobradas hoy</div>
-            {historial.length === 0 && !cargandoHistorial && <div style={{ color: "#2a2a2a", textAlign: "center", padding: 40 }}>Sin ventas registradas hoy</div>}
+            {/* Selector de fecha */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, padding: '12px 16px', background: '#111', borderRadius: 10, border: '1px solid #1e1e1e' }}>
+              <span style={{ fontSize: 11, color: '#555', letterSpacing: 2, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Ver día</span>
+              <input
+                type="date"
+                value={fechaHistorial}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => {
+                  setFechaHistorial(e.target.value);
+                  fetchHistorial(e.target.value);
+                }}
+                style={{
+                  background: '#0f0f0f', border: '1px solid #222', borderRadius: 7,
+                  padding: '7px 10px', color: '#ccc', fontSize: 13,
+                  fontFamily: 'inherit', cursor: 'pointer',
+                }}
+              />
+              {fechaHistorial !== new Date().toISOString().slice(0, 10) && (
+                <button
+                  onClick={() => { setFechaHistorial(new Date().toISOString().slice(0, 10)); fetchHistorial(new Date().toISOString().slice(0, 10)); }}
+                  style={{ background: 'none', border: '1px solid #222', borderRadius: 6, padding: '5px 10px', color: '#555', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  Volver a hoy
+                </button>
+              )}
+            </div>
+
+            {/* Lista de ventas */}
+            <div style={{ fontSize: 11, color: '#444', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 }}>
+              {cargandoHistorial ? 'Cargando...' : `${historial.length} ventas — ${fechaHistorial.split('-').reverse().join('/')}`}
+            </div>
+            {historial.length === 0 && !cargandoHistorial && <div style={{ color: "#2a2a2a", textAlign: "center", padding: 40 }}>Sin ventas registradas para esta fecha</div>}
             {historial.map((o) => (
               <div key={o.id} className="fade-in" style={{ background: "#111", borderRadius: 10, padding: "14px 16px", marginBottom: 10, borderLeft: `3px solid ${o.origen === "gomeria" ? "#3b82f6" : "#8b5cf6"}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>

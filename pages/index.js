@@ -26,6 +26,10 @@ export default function Home() {
           style={{ padding: '24px 48px', background: '#052e16', border: '2px solid #065f46', borderRadius: 14, color: '#6ee7b7', fontSize: 22, fontWeight: 800, cursor: 'pointer', letterSpacing: 1 }}>
           📊 DASHBOARD
         </button>
+        <button onClick={() => router.push('/admin')}
+          style={{ padding: '24px 48px', background: '#1e1b4b', border: '2px solid #3730a3', borderRadius: 14, color: '#a5b4fc', fontSize: 22, fontWeight: 800, cursor: 'pointer', letterSpacing: 1 }}>
+          ⚙️ ADMIN
+        </button>
       </div>
     </div>
   );

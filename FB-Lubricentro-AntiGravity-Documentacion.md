@@ -376,8 +376,8 @@ Crear `.env.local` en la raíz con las mismas variables. Este archivo está en `
 - [x] **Login para dashboard** *(Sprint 2)* — usuario/contraseña hardcodeado, sesión en sessionStorage
 - [x] **Base de datos de clientes por patente** *(Sprint 3)* — autocomplete en gomería al tipear la patente, modal rediseñado
 - [x] **Autenticación completa** *(Sprint 4)* — protege /caja, /importar y /dashboard; login con tarjetas de usuario, sesión por jornada laboral
-- [ ] **Administración de productos desde la app** *(Sprint 5)* — ABM de productos y servicios sin tocar el Sheet manualmente
-- [ ] **Historial con paginación y filtros** — consulta de días anteriores desde caja
+- [x] **Administración de productos desde la app** *(Sprint 5)* — ABM de servicios/productos/usuarios, historial con filtro de fecha
+- [ ] **Historial con paginación** — consulta de rangos de fechas con totales por período
 - [ ] **Google Business Profile API** — gestión de reseñas
 - [ ] **Migración a PostgreSQL vía Prisma** — reemplaza Google Sheets como DB principal
 
@@ -458,40 +458,58 @@ Devuelve en un solo llamado:
 
 ---
 
-## 20. Sprint 5 — Plan tentativo
+## 20. Sprint 5 — Administración desde la app ✅
 
-**Objetivo:** Dejar la app completamente operable por una persona sin conocimientos técnicos, eliminando la necesidad de tocar Google Sheets manualmente para las tareas del día a día.
+**Objetivo cumplido:** La app es completamente operable por una persona sin conocimientos técnicos. Ya no es necesario abrir Google Sheets para las tareas del día a día.
 
-### Problema actual
-Hoy, para agregar o editar un producto/servicio, el usuario tiene que:
-1. Abrir Google Sheets
-2. Encontrar la pestaña correcta (`productos_gomeria` o `servicios_gomeria`)
-3. Editar celdas manualmente sin validación
-4. Conocer el formato exacto de cada columna
+### Nuevas funcionalidades
 
-Esto es una barrera alta para alguien no técnico.
-
-### Funcionalidades planificadas
-
-#### Pantalla de Administración `/admin` *(nueva, protegida)*
-- **ABM de servicios de gomería**: agregar, editar nombre/precio/ícono/grupo, activar/desactivar botones
-- **ABM de productos de gomería**: agregar, editar precio/stock/alerta, activar/desactivar
-- **Ajuste manual de stock**: sumar o restar unidades directamente desde la app
-- **Gestión de usuarios**: agregar/cambiar contraseña desde la interfaz (sin tocar código)
+#### Pantalla `/admin` *(nueva, requiere rol `admin`)*
+- **ABM de servicios de gomería**: agregar, editar nombre/precio/ícono/grupo, activar/desactivar
+- **ABM de productos de gomería**: agregar, editar precios/alertas, activar/desactivar
+- **Ajuste manual de stock**: sumar o restar unidades desde la app con vista previa del resultado
+- **Gestión de usuarios**: agregar usuarios, cambiar nombre/contraseña/rol desde la interfaz
 
 #### Mejoras en caja
-- **Historial con filtros de fecha**: poder consultar cualquier día anterior sin ir al Sheet
+- **Historial con filtro de fecha**: selector de fecha en el tab Historial — permite consultar cualquier día anterior. Botón "Volver a hoy" para resetear.
 
-#### Objetivo de usabilidad
-Una vez terminado el Sprint 5, el único motivo para abrir Google Sheets debería ser ver datos crudos o hacer backups. Las operaciones del día a día se hacen íntegramente desde la app.
+### Sistema de roles
+| Rol | Acceso |
+|---|---|
+| `admin` | `/caja`, `/importar`, `/dashboard`, `/admin` |
+| `cajero` | `/caja`, `/importar`, `/dashboard` (sin `/admin`) |
 
-### Notas para arrancar el Sprint 5
-1. La pantalla `/admin` reutiliza `AuthGuard` — ya está lista la infraestructura de auth.
-2. El helper `updateRowWhere` en `lib/sheets.js` ya puede editar filas existentes.
-3. Para el ABM de servicios, la hoja `servicios_gomeria` tiene el campo `activo` que permite ocultar sin borrar.
-4. Para el ABM de productos, idem con `productos_gomeria`.
-5. Necesitará nuevas API Routes: `PUT /api/admin/servicios/[id]`, `PUT /api/admin/productos/[id]`, `POST /api/admin/servicios`, `POST /api/admin/productos`.
+### Nuevas API Routes
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `/api/admin/servicios` | GET + POST | Lista y crea servicios |
+| `/api/admin/servicios/[id]` | PUT | Edita un servicio |
+| `/api/admin/productos` | GET + POST | Lista y crea productos |
+| `/api/admin/productos/[id]` | PUT | Edita / ajusta stock |
+| `/api/admin/usuarios` | GET + POST | Lista (sin passwords) y crea usuarios |
+| `/api/admin/usuarios/[usuario]` | PUT | Edita nombre/password/rol |
+| `/api/admin/usuarios/login` | POST | Valida credenciales (usado por auth) |
+| `/api/admin/usuarios/lista` | GET | Lista para pantalla de login |
+
+### Pestaña `usuarios` en el Sheet
+Nueva pestaña con columnas: `usuario` · `password` · `nombre` · `rol`
+
+> Los usuarios ya no están hardcodeados en el código. Se administran desde `/admin` o directamente desde el Sheet.
+
+### Bug corregido
+La sesión se creaba con expiración pasada cuando el login ocurría después de `HORA_CIERRE`. Corregido en `lib/auth.js`: si ya pasó la hora de cierre, la expiración se mueve al día siguiente.
 
 ---
 
-*Documentación actualizada: Sprint 4 — 27/05/2026*
+## 21. Sprint 6 — Plan tentativo
+
+### Candidatos para el próximo sprint
+
+- **Cierre de caja**: resumen del día exportable (PDF o imprimible) con total por forma de pago, cantidad de ventas y desglose — para el arqueo físico al final de la jornada
+- **Historial por rango de fechas**: en el Dashboard, poder seleccionar `desde` y `hasta` para ver totales de cualquier período (la API ya soporta esto, falta la UI)
+- **Notificación de stock bajo**: alerta visible en caja cuando hay productos por debajo del mínimo, sin tener que entrar al admin
+
+---
+
+*Documentación actualizada: Sprint 5 — 28/05/2026*
+
