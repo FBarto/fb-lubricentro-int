@@ -361,11 +361,12 @@ Crear `.env.local` en la raíz con las mismas variables. Este archivo está en `
 
 | Limitación | Causa | Solución futura |
 |---|---|---|
-| Sin autenticación | No implementada aún | Login simple (NextAuth o similar) |
+| ~~Sin autenticación~~ | ✅ Resuelto en Sprint 4 | Login unificado con sesión por jornada |
 | Sin transacciones atómicas | Google Sheets no es una DB transaccional | Migración a PostgreSQL/Prisma |
 | Concurrencia limitada | Sheets no maneja bien escrituras simultáneas | PostgreSQL |
 | Historial solo del día | API filtra por `fecha === hoy` sin paginación | Dashboard con filtros de fecha |
 | Stock puede desincronizarse | Falta de atomicidad entre venta y descuento de stock | Transacciones en DB real |
+| ABM de productos requiere Sheet | No hay pantalla de administración en la app | Sprint 5 |
 
 ---
 
@@ -373,11 +374,9 @@ Crear `.env.local` en la raíz con las mismas variables. Este archivo está en `
 
 - [x] **Dashboard de métricas** *(Sprint 2)* — ventas del día/semana/mes, formas de pago, franja horaria, top servicios, alertas de stock
 - [x] **Login para dashboard** *(Sprint 2)* — usuario/contraseña hardcodeado, sesión en sessionStorage
-- [x] **Base de datos de clientes por patente** *(Sprint 3)* — autocomplete en gomería al tipear la patente
-- [x] **Autenticación completa** *(Sprint 4)* — protege /caja, /importar y /dashboard con login unificado, sesión por jornada laboral
-- [ ] **Autenticación completa** — proteger `/caja` y `/importar`, migrar a NextAuth o similar
-- [ ] **Módulo completo de lubricentro** — catálogo de productos con búsqueda avanzada
-- [ ] **Base de datos de clientes por patente** — historial de atenciones por vehículo
+- [x] **Base de datos de clientes por patente** *(Sprint 3)* — autocomplete en gomería al tipear la patente, modal rediseñado
+- [x] **Autenticación completa** *(Sprint 4)* — protege /caja, /importar y /dashboard; login con tarjetas de usuario, sesión por jornada laboral
+- [ ] **Administración de productos desde la app** *(Sprint 5)* — ABM de productos y servicios sin tocar el Sheet manualmente
 - [ ] **Historial con paginación y filtros** — consulta de días anteriores desde caja
 - [ ] **Google Business Profile API** — gestión de reseñas
 - [ ] **Migración a PostgreSQL vía Prisma** — reemplaza Google Sheets como DB principal
@@ -439,20 +438,6 @@ Desde el header de `/caja`, `/importar` o `/dashboard` hay un botón **CAMBIAR**
 
 ---
 
-## 19. Login del dashboard *(reemplazado por Sprint 4)*
-
-| Campo | Valor |
-|---|---|
-| Usuario | `admin` |
-| Contraseña | `fb2026` |
-| Implementación | Hardcodeado en `pages/dashboard.js` (constantes `USUARIO` / `PASSWORD`) |
-| Sesión | `sessionStorage` — se limpia al cerrar el browser |
-| Alcance | Solo protege `/dashboard`. El resto del sistema es abierto |
-
-> Para cambiar las credenciales: editar las constantes en la línea 4-5 de `pages/dashboard.js` y hacer push a `main`.
-
----
-
 ## 19. API `/api/dashboard/metricas`
 
 Devuelve en un solo llamado:
@@ -473,5 +458,40 @@ Devuelve en un solo llamado:
 
 ---
 
-*Documentación actualizada: Sprint 4 — 27/05/2026*
+## 20. Sprint 5 — Plan tentativo
 
+**Objetivo:** Dejar la app completamente operable por una persona sin conocimientos técnicos, eliminando la necesidad de tocar Google Sheets manualmente para las tareas del día a día.
+
+### Problema actual
+Hoy, para agregar o editar un producto/servicio, el usuario tiene que:
+1. Abrir Google Sheets
+2. Encontrar la pestaña correcta (`productos_gomeria` o `servicios_gomeria`)
+3. Editar celdas manualmente sin validación
+4. Conocer el formato exacto de cada columna
+
+Esto es una barrera alta para alguien no técnico.
+
+### Funcionalidades planificadas
+
+#### Pantalla de Administración `/admin` *(nueva, protegida)*
+- **ABM de servicios de gomería**: agregar, editar nombre/precio/ícono/grupo, activar/desactivar botones
+- **ABM de productos de gomería**: agregar, editar precio/stock/alerta, activar/desactivar
+- **Ajuste manual de stock**: sumar o restar unidades directamente desde la app
+- **Gestión de usuarios**: agregar/cambiar contraseña desde la interfaz (sin tocar código)
+
+#### Mejoras en caja
+- **Historial con filtros de fecha**: poder consultar cualquier día anterior sin ir al Sheet
+
+#### Objetivo de usabilidad
+Una vez terminado el Sprint 5, el único motivo para abrir Google Sheets debería ser ver datos crudos o hacer backups. Las operaciones del día a día se hacen íntegramente desde la app.
+
+### Notas para arrancar el Sprint 5
+1. La pantalla `/admin` reutiliza `AuthGuard` — ya está lista la infraestructura de auth.
+2. El helper `updateRowWhere` en `lib/sheets.js` ya puede editar filas existentes.
+3. Para el ABM de servicios, la hoja `servicios_gomeria` tiene el campo `activo` que permite ocultar sin borrar.
+4. Para el ABM de productos, idem con `productos_gomeria`.
+5. Necesitará nuevas API Routes: `PUT /api/admin/servicios/[id]`, `PUT /api/admin/productos/[id]`, `POST /api/admin/servicios`, `POST /api/admin/productos`.
+
+---
+
+*Documentación actualizada: Sprint 4 — 27/05/2026*
