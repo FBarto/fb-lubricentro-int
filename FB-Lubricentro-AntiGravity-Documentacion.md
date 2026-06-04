@@ -496,20 +496,43 @@ Nueva pestaña con columnas: `usuario` · `password` · `nombre` · `rol`
 
 > Los usuarios ya no están hardcodeados en el código. Se administran desde `/admin` o directamente desde el Sheet.
 
-### Bug corregido
-La sesión se creaba con expiración pasada cuando el login ocurría después de `HORA_CIERRE`. Corregido en `lib/auth.js`: si ya pasó la hora de cierre, la expiración se mueve al día siguiente.
+### Bugs y Mejoras corregidas
+* **Sesión vencida:** La sesión se creaba con expiración pasada cuando el login ocurría después de `HORA_CIERRE`. Corregido en `lib/auth.js` (si ya pasó la hora de cierre, la expiración se mueve al día siguiente).
+* **Configuración del Deploy en Vercel:** Se creó un archivo `vercel.json` en la raíz del proyecto para forzar el preset de `nextjs` y evitar problemas con la ruta de salida (`.next`).
+* **Detector Inteligente de Cabeceras en Excel:** En `pages/importar.js`, se implementó un filtro que descarta filas con menos de 2 celdas con contenido (logos, publicidades, banners del inicio) y cuenta coincidencias de palabras clave de manera celda-a-celda. Mantiene los índices intactos para evitar el corrimiento de datos.
 
 ---
 
-## 21. Sprint 6 — Plan tentativo
+## 21. Sprint 6 — Plan tentativo y Propuestas
 
 ### Candidatos para el próximo sprint
 
-- **Cierre de caja**: resumen del día exportable (PDF o imprimible) con total por forma de pago, cantidad de ventas y desglose — para el arqueo físico al final de la jornada
-- **Historial por rango de fechas**: en el Dashboard, poder seleccionar `desde` y `hasta` para ver totales de cualquier período (la API ya soporta esto, falta la UI)
-- **Notificación de stock bajo**: alerta visible en caja cuando hay productos por debajo del mínimo, sin tener que entrar al admin
+- **Cierre de caja**: Resumen del día exportable (PDF o imprimible) con total por forma de pago, cantidad de ventas y desglose — para el arqueo físico al final de la jornada.
+- **Historial por rango de fechas**: En el Dashboard, poder seleccionar `desde` y `hasta` para ver totales de cualquier período (la API ya soporta esto, falta la UI).
+- **Notificación de stock bajo**: Alerta visible en caja cuando hay productos por debajo del mínimo, sin tener que entrar al admin.
+- **Edición rápida en Importador (UI/UX)**: Permitir modificar filas, columnas y categorías en masa antes de importar (ver sección 22).
 
 ---
 
-*Documentación actualizada: Sprint 5 — 28/05/2026*
+## 22. Propuesta de Edición Rápida en Importación
+
+Para permitir editar filas, columnas y categorías rápidamente antes de confirmar la importación en el paso 3 (Previsualización), se propone el siguiente diseño interactivo:
+
+1. **Edición de Categorías por Fila:**
+   * En lugar de mostrar un texto estático o un guión (`—`), la columna "Categoría" tendrá un `<select>` desplegable pre-cargado con las categorías válidas (`aceites`, `filtros`, `bujias`, etc.).
+   * Si la auto-detección falla, el usuario podrá elegir la categoría correcta para ese producto individual en 2 clics antes de importar.
+
+2. **Edición Manual de Datos (Inputs Inline):**
+   * Las celdas de **Nombre**, **Código** y **Precio** se mostrarán como texto normal, pero al hacer clic se transformarán en campos de texto editables (`<input>`), permitiendo corregir errores tipográficos del Excel o ajustar precios manualmente.
+
+3. **Acciones por Fila (Eliminar):**
+   * Añadir una columna final con un botón "🗑️" para eliminar ese producto específico del listado en memoria y evitar que se importe.
+
+4. **Acciones Masivas en el Encabezado (Bulk Actions):**
+   * **Categorización Masiva:** Un selector superior: *"Aplicar categoría [ Seleccionar ] a todos los productos"*. Ideal para cuando todo el archivo corresponde a un solo tipo de artículo.
+   * **Ajuste de Precios Masivo:** Un campo opcional para aplicar un recargo o descuento porcentual general (ej: añadir un +21% si la lista vino sin IVA).
+
+---
+
+*Documentación actualizada: 04/06/2026*
 
