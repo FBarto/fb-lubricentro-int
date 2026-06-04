@@ -73,17 +73,34 @@ function ImportadorContent() {
         const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
         if (!json.length) { setError("El archivo está vacío."); return; }
 
-        // Detectar fila de encabezados — buscar la primera fila con palabras clave
-        const keywords = ["cod", "desc", "nom", "prec", "valor", "art", "prod", "pvp", "cost", "precio", "venta", "oferta"];
+        // Detectar fila de encabezados — buscar la primera fila con palabras clave y varias celdas pobladas
+        const keywords = ["cod", "desc", "nom", "prec", "valor", "art", "prod", "pvp", "cost", "precio", "venta", "oferta", "stock", "marca", "detal"];
         let headerRowIdx = 0;
-        for (let i = 0; i < Math.min(20, json.length); i++) {
+        for (let i = 0; i < Math.min(30, json.length); i++) {
           const row = json[i];
-          const text = row.map((c) => String(c || "").toLowerCase()).join(" ");
-          const matches = keywords.filter((k) => text.includes(k)).length;
-          if (matches >= 2) { headerRowIdx = i; break; }
+          if (!row) continue;
+
+          const cellsText = row.map(c => String(c || "").trim());
+          const populatedCells = cellsText.filter(Boolean).length;
+          if (populatedCells < 2) continue; // Descarta filas de banners, logos o vacías
+
+          let celdasConKeywords = 0;
+          cellsText.forEach(cellText => {
+            if (!cellText) return;
+            const lText = cellText.toLowerCase();
+            const matchesKeyword = keywords.some(k => lText.includes(k));
+            if (matchesKeyword) celdasConKeywords++;
+          });
+
+          // Si hay al menos 2 celdas que coinciden con palabras clave, seleccionamos esta fila
+          if (celdasConKeywords >= 2) {
+            headerRowIdx = i;
+            break;
+          }
         }
 
-        const headers = json[headerRowIdx].map((h) => String(h || "").trim()).filter((h) => h !== "");
+        // Mantenemos todas las columnas (incluso las vacías) para conservar la alineación de índices
+        const headers = json[headerRowIdx].map((h) => String(h || "").trim());
         const rows = json.slice(headerRowIdx + 1).filter((r) => r.some((c) => c !== "" && c !== null && c !== undefined));
         setColumnas(headers);
         setFilas(rows);
