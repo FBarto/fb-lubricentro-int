@@ -3,6 +3,17 @@ import AuthGuard, { useAuth } from '../components/AuthGuard';
 
 const GRUPOS = ['Autos', 'Motos', 'Camionetas', 'Otros'];
 const ROLES = ['admin', 'cajero'];
+const CATEGORIAS_LUB = [
+  { id: 'aceites',      label: 'Aceites de motor' },
+  { id: 'filtros',      label: 'Filtros' },
+  { id: 'bujias',       label: 'Bujías' },
+  { id: 'frenos',       label: 'Frenos' },
+  { id: 'refrigerante', label: 'Refrigerante' },
+  { id: 'aditivos',     label: 'Aditivos' },
+  { id: 'accesorios',   label: 'Accesorios' },
+  { id: 'escobillas',   label: 'Escobillas' },
+];
+
 
 const fmt = (n) => '$' + Number(n || 0).toLocaleString('es-AR');
 
@@ -105,17 +116,21 @@ function AdminContent() {
   const [tab, setTab] = useState('servicios');
 
   // Datos
-  const [servicios, setServicios] = useState([]);
-  const [productos, setProductos] = useState([]);
-  const [usuarios, setUsuarios]   = useState([]);
-  const [cargando, setCargando]   = useState(true);
+  const [servicios, setServicios]       = useState([]);
+  const [productos, setProductos]       = useState([]);
+  const [usuarios, setUsuarios]         = useState([]);
+  const [prodLub, setProdLub]           = useState([]);
+  const [margenes, setMargenes]         = useState([]);
+  const [cargando, setCargando]         = useState(true);
 
   // Modales
-  const [modalServicio, setModalServicio]         = useState(null); // null | 'editar' | 'crear'
+  const [modalServicio, setModalServicio]         = useState(null);
   const [modalProducto, setModalProducto]         = useState(null);
   const [modalStock, setModalStock]               = useState(null);
   const [modalUsuario, setModalUsuario]           = useState(null);
-  const [itemActivo, setItemActivo]               = useState(null); // el objeto que se está editando
+  const [modalLub, setModalLub]                   = useState(null); // 'crear'|'editar'
+  const [modalMargenes, setModalMargenes]         = useState(false);
+  const [itemActivo, setItemActivo]               = useState(null);
 
   // Feedback
   const [toast, setToast] = useState(null);
@@ -128,14 +143,19 @@ function AdminContent() {
   async function cargarTodo() {
     setCargando(true);
     try {
-      const [sRes, pRes, uRes] = await Promise.all([
+      const [sRes, pRes, uRes, lRes, mRes] = await Promise.all([
         fetch('/api/admin/servicios'),
         fetch('/api/admin/productos'),
         fetch('/api/admin/usuarios'),
+        fetch('/api/lubricentro/productos'),
+        fetch('/api/lubricentro/config'),
       ]);
       setServicios(sRes.ok ? await sRes.json() : []);
       setProductos(pRes.ok ? await pRes.json() : []);
       setUsuarios(uRes.ok  ? await uRes.json()  : []);
+      setProdLub(lRes.ok   ? await lRes.json()  : []);
+      const mData = mRes.ok ? await mRes.json() : {};
+      setMargenes(mData.categorias || []);
     } finally {
       setCargando(false);
     }
@@ -189,9 +209,10 @@ function AdminContent() {
           <div style={{ width: 1, height: 32, background: '#222' }} />
           <div style={{ display: 'flex', gap: 4 }}>
             {[
-              { id: 'servicios', label: '⚙️ Servicios' },
-              { id: 'productos', label: '📦 Productos' },
-              { id: 'usuarios',  label: '👤 Usuarios' },
+              { id: 'servicios',   label: '⚙️ Servicios' },
+              { id: 'productos',   label: '📦 Productos' },
+              { id: 'lubricentro', label: '🪢 Lubricentro' },
+              { id: 'usuarios',    label: '👤 Usuarios' },
             ].map((t) => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 style={{ padding: '6px 14px', borderRadius: 7, border: 'none', background: tab === t.id ? '#1d4ed8' : 'transparent', color: tab === t.id ? '#fff' : '#555', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}>
@@ -346,6 +367,86 @@ function AdminContent() {
             </div>
           )}
 
+          {/* ── TAB LUBRICENTRO ── */}
+          {!cargando && tab === 'lubricentro' && (
+            <div className="fade-in">
+              {/* Encabezado con acciones */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ fontSize: 11, color: '#444', letterSpacing: 2, textTransform: 'uppercase' }}>
+                    {prodLub.length} productos
+                  </div>
+                  <a href="/sincronizar"
+                    style={{ fontSize: 12, padding: '5px 12px', borderRadius: 6, border: '1px solid #1e3a8a', color: '#93c5fd', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    🔄 Sincronizar con Fusión
+                  </a>
+                  <button
+                    onClick={() => setModalMargenes(true)}
+                    style={{ fontSize: 12, padding: '5px 12px', borderRadius: 6, border: '1px solid #333', color: '#888', background: 'none', cursor: 'pointer' }}>
+                    ⚙️ Márgenes
+                  </button>
+                </div>
+                <button onClick={() => { setItemActivo({}); setModalLub('crear'); }}
+                  style={{ background: '#1d4ed8', border: 'none', borderRadius: 8, padding: '8px 16px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  + Nuevo Producto
+                </button>
+              </div>
+
+              {/* Lista por categoría */}
+              {CATEGORIAS_LUB.map((cat) => {
+                const lista = prodLub.filter((p) => p.categoria === cat.id);
+                if (lista.length === 0) return null;
+                const margenCat = margenes.find((m) => m.id === cat.id)?.margen || 40;
+                return (
+                  <div key={cat.id} style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 11, color: '#8b5cf6', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>{cat.label}</span>
+                      <span style={{ color: '#555', fontWeight: 400 }}>margen {margenCat}%</span>
+                    </div>
+                    {lista.map((p) => {
+                      const stockBajo = Number(p.stock) <= Number(p.alerta_stock) && Number(p.alerta_stock) > 0;
+                      return (
+                        <div key={p.id} className="row-item" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, marginBottom: 4, transition: 'background 0.15s', borderLeft: stockBajo ? '3px solid #ef4444' : '3px solid transparent' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: p.activo === 'true' ? '#ddd' : '#444', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.nombre}</div>
+                            <div style={{ fontSize: 11, color: '#555' }}>
+                              {[p.marca, p.proveedor && `via ${p.proveedor}`].filter(Boolean).join(' · ')}
+                              {p.ultima_actualizacion && <span style={{ marginLeft: 8, color: '#333' }}>act. {p.ultima_actualizacion}</span>}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right', minWidth: 90 }}>
+                            <div style={{ fontSize: 10, color: '#555' }}>Costo</div>
+                            <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 15, fontWeight: 700, color: '#f59e0b' }}>{fmt(p.precio_costo)}</div>
+                          </div>
+                          <div style={{ textAlign: 'right', minWidth: 90 }}>
+                            <div style={{ fontSize: 10, color: '#555' }}>Venta</div>
+                            <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 17, fontWeight: 800, color: p.activo === 'true' ? '#fff' : '#333' }}>{fmt(p.precio_venta)}</div>
+                          </div>
+                          <div style={{ textAlign: 'center', minWidth: 50 }}>
+                            <div style={{ fontSize: 10, color: stockBajo ? '#ef4444' : '#555' }}>Stock</div>
+                            <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 16, fontWeight: 800, color: stockBajo ? '#ef4444' : (p.activo === 'true' ? '#fff' : '#333') }}>{p.stock}</div>
+                          </div>
+                          <button className="btn-sm" onClick={() => { setItemActivo({ ...p }); setModalLub('editar'); }}
+                            style={{ background: 'none', border: '1px solid #222', borderRadius: 6, padding: '5px 10px', color: '#555', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            Editar
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+
+              {prodLub.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '48px 0', color: '#333' }}>
+                  <div style={{ fontSize: 32, marginBottom: 12 }}>🪢</div>
+                  <div style={{ marginBottom: 8 }}>No hay productos en el catálogo lubricentro todavía.</div>
+                  <div style={{ fontSize: 13, color: '#444' }}>Usá “Sincronizar con Fusión” o “Nuevo Producto” para empezar.</div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── TAB USUARIOS ── */}
           {!cargando && tab === 'usuarios' && (
             <div className="fade-in">
@@ -463,6 +564,36 @@ function AdminContent() {
           onGuardado={async () => {
             setModalUsuario(null); setItemActivo(null);
             mostrarToast(modalUsuario === 'crear' ? 'Usuario creado' : 'Usuario actualizado');
+            await cargarTodo();
+          }}
+          onError={(msg) => mostrarToast(msg, 'error')}
+        />
+      )}
+
+      {/* ── MODAL MÁRGENES LUBRICENTRO ── */}
+      {modalMargenes && (
+        <ModalMargenes
+          margenes={margenes}
+          onClose={() => setModalMargenes(false)}
+          onGuardado={async () => {
+            setModalMargenes(false);
+            mostrarToast('Márgenes actualizados');
+            await cargarTodo();
+          }}
+          onError={(msg) => mostrarToast(msg, 'error')}
+        />
+      )}
+
+      {/* ── MODAL PRODUCTO LUBRICENTRO ── */}
+      {modalLub && itemActivo && (
+        <ModalLubricentro
+          modo={modalLub}
+          inicial={itemActivo}
+          margenes={margenes}
+          onClose={() => { setModalLub(null); setItemActivo(null); }}
+          onGuardado={async () => {
+            setModalLub(null); setItemActivo(null);
+            mostrarToast(modalLub === 'crear' ? 'Producto creado' : 'Producto actualizado');
             await cargarTodo();
           }}
           onError={(msg) => mostrarToast(msg, 'error')}
@@ -728,6 +859,207 @@ function ModalUsuario({ modo, inicial, onClose, onGuardado, onError }) {
           {ROLES.map((r) => <option key={r} value={r}>{r === 'admin' ? 'Admin — acceso a /admin' : 'Cajero — acceso a /caja e /importar'}</option>)}
         </select>
       </Campo>
+      <BotonesModal onClose={onClose} onGuardar={guardar} guardando={guardando} />
+    </Modal>
+  );
+}
+
+// ─── Modal Márgenes por Categoría ────────────────────────────────────────────
+function ModalMargenes({ margenes, onClose, onGuardado, onError }) {
+  const [vals, setVals] = useState(
+    Object.fromEntries(margenes.map((m) => [m.id, String(m.margen)]))
+  );
+  const [guardando, setGuardando] = useState(false);
+
+  async function guardar() {
+    setGuardando(true);
+    try {
+      const categorias = CATEGORIAS_LUB.map((c) => ({
+        id: c.id,
+        margen: Number(vals[c.id] || 40),
+      }));
+      const res = await fetch('/api/lubricentro/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categorias }),
+      });
+      const data = await res.json();
+      if (!res.ok) return onError(data.error || 'Error al guardar');
+      onGuardado();
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <Modal title="Márgenes por Categoría" onClose={onClose}>
+      <div style={{ fontSize: 12, color: '#555', marginBottom: 16 }}>
+        El precio de venta se calcula como: <strong style={{ color: '#aaa' }}>costo × (1 + margen%)</strong>
+      </div>
+      {CATEGORIAS_LUB.map((cat) => (
+        <Campo key={cat.id} label={cat.label}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="number"
+              min={0}
+              max={200}
+              value={vals[cat.id] ?? '40'}
+              onChange={(e) => setVals((v) => ({ ...v, [cat.id]: e.target.value }))}
+              style={{ ...inputStyle, width: 100, textAlign: 'center' }}
+            />
+            <span style={{ fontSize: 13, color: '#555' }}>%</span>
+            <span style={{ fontSize: 12, color: '#444' }}>
+              → venta = costo × {(1 + (Number(vals[cat.id] || 40) / 100)).toFixed(2)}
+            </span>
+          </div>
+        </Campo>
+      ))}
+      <BotonesModal onClose={onClose} onGuardar={guardar} guardando={guardando} label="GUARDAR MÁRGENES" />
+    </Modal>
+  );
+}
+
+// ─── Modal Producto Lubricentro ───────────────────────────────────────────────
+function ModalLubricentro({ modo, inicial, margenes, onClose, onGuardado, onError }) {
+  const getMargen = (cat) => {
+    const m = margenes.find((x) => x.id === cat);
+    return m ? Number(m.margen) : 40;
+  };
+
+  const [form, setForm] = useState({
+    id:           inicial.id           || '',
+    codigo:       inicial.codigo       || '',
+    nombre:       inicial.nombre       || '',
+    categoria:    inicial.categoria    || 'aceites',
+    marca:        inicial.marca        || '',
+    proveedor:    inicial.proveedor    || '',
+    precio_costo: inicial.precio_costo || '',
+    precio_lista: inicial.precio_lista || '',
+    precio_venta: inicial.precio_venta || '',
+    stock:        inicial.stock        || '0',
+    alerta_stock: inicial.alerta_stock || '2',
+    activo:       inicial.activo       ?? 'true',
+  });
+  const [guardando, setGuardando] = useState(false);
+
+  const set = (k, v) => setForm((f) => {
+    const next = { ...f, [k]: v };
+    // Recalcular precio_venta cuando cambia costo o categoría
+    if ((k === 'precio_costo' || k === 'categoria') && next.precio_costo) {
+      const m = getMargen(next.categoria);
+      next.precio_venta = String(Math.ceil(Number(next.precio_costo) * (1 + m / 100)));
+    }
+    return next;
+  });
+
+  const margenCat = getMargen(form.categoria);
+  const pvCalculado = form.precio_costo
+    ? Math.ceil(Number(form.precio_costo) * (1 + margenCat / 100))
+    : 0;
+
+  async function guardar() {
+    if (!form.nombre || !form.precio_costo) return onError('Completá nombre y precio de costo');
+    if (modo === 'crear' && !form.id) return onError('El ID es obligatorio');
+    setGuardando(true);
+    try {
+      const url = modo === 'crear'
+        ? '/api/lubricentro/productos'
+        : `/api/lubricentro/productos/${inicial.id}`;
+      const method = modo === 'crear' ? 'POST' : 'PUT';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          margen: margenCat,
+          precio_venta: form.precio_venta || pvCalculado,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) return onError(data.error || 'Error al guardar');
+      onGuardado();
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <Modal title={modo === 'crear' ? 'Nuevo Producto Lubricentro' : `Editar: ${inicial.nombre}`} onClose={onClose}>
+      {modo === 'crear' && (
+        <Campo label="ID" hint="— letras, números y guiones bajos">
+          <input value={form.id} onChange={(e) => set('id', e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+            placeholder="ej: motul_5100_1l" style={inputStyle} />
+        </Campo>
+      )}
+      <Campo label="Nombre">
+        <input value={form.nombre} onChange={(e) => set('nombre', e.target.value)}
+          placeholder="ej: Motul 5100 4T 15W50 1L" style={inputStyle} />
+      </Campo>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Campo label="Categoría">
+          <select value={form.categoria} onChange={(e) => set('categoria', e.target.value)} style={inputStyle}>
+            {CATEGORIAS_LUB.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+          </select>
+        </Campo>
+        <Campo label="Marca">
+          <input value={form.marca} onChange={(e) => set('marca', e.target.value)}
+            placeholder="ej: Motul" style={inputStyle} />
+        </Campo>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Campo label="Código proveedor">
+          <input value={form.codigo} onChange={(e) => set('codigo', e.target.value)}
+            placeholder="ej: MOT-5100-1L" style={inputStyle} />
+        </Campo>
+        <Campo label="Proveedor">
+          <input value={form.proveedor} onChange={(e) => set('proveedor', e.target.value)}
+            placeholder="ej: fusion" style={inputStyle} />
+        </Campo>
+      </div>
+
+      {/* Precios */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Campo label="Precio costo ($)">
+          <input type="number" value={form.precio_costo} onChange={(e) => set('precio_costo', e.target.value)}
+            placeholder="0" style={inputStyle} />
+        </Campo>
+        <Campo label="Precio lista sugerido ($)" hint="opcional">
+          <input type="number" value={form.precio_lista} onChange={(e) => set('precio_lista', e.target.value)}
+            placeholder="0" style={inputStyle} />
+        </Campo>
+      </div>
+
+      {/* Precio venta calculado */}
+      <div style={{ background: '#0f0f0f', borderRadius: 10, padding: '12px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: 10, color: '#555', letterSpacing: 1 }}>PRECIO VENTA (margen {margenCat}%)</div>
+          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 26, fontWeight: 800, color: '#3b82f6' }}>
+            ${pvCalculado.toLocaleString('es-AR')}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 10, color: '#555', marginBottom: 4 }}>Ajustar manualmente</div>
+          <input
+            type="number"
+            value={form.precio_venta}
+            onChange={(e) => setForm((f) => ({ ...f, precio_venta: e.target.value }))}
+            placeholder={String(pvCalculado)}
+            style={{ ...inputStyle, width: 120, textAlign: 'right' }}
+          />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Campo label="Stock">
+          <input type="number" value={form.stock} onChange={(e) => set('stock', e.target.value)}
+            placeholder="0" style={inputStyle} />
+        </Campo>
+        <Campo label="Alerta stock mínimo">
+          <input type="number" value={form.alerta_stock} onChange={(e) => set('alerta_stock', e.target.value)}
+            placeholder="2" style={inputStyle} />
+        </Campo>
+      </div>
+
       <BotonesModal onClose={onClose} onGuardar={guardar} guardando={guardando} />
     </Modal>
   );

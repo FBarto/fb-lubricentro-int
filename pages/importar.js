@@ -3,14 +3,32 @@ import * as XLSX from "xlsx";
 import AuthGuard, { useAuth } from "../components/AuthGuard";
 
 
-const CAMPOS_DESTINO = [
-  { id: "codigo", label: "Código", requerido: false },
-  { id: "nombre", label: "Nombre", requerido: true },
-  { id: "categoria", label: "Categoría", requerido: false },
-  { id: "precio", label: "Precio", requerido: true },
-  { id: "activo", label: "Activo", requerido: false },
-  { id: "ignorar", label: "— Ignorar columna —", requerido: false },
+const CAMPOS_GOMERIA = [
+  { id: "codigo",    label: "Código",       requerido: false },
+  { id: "nombre",    label: "Nombre",        requerido: true  },
+  { id: "categoria", label: "Categoría",     requerido: false },
+  { id: "precio",    label: "Precio",        requerido: true  },
+  { id: "activo",    label: "Activo",        requerido: false },
+  { id: "ignorar",   label: "— Ignorar columna —", requerido: false },
 ];
+
+const CAMPOS_LUBRICENTRO = [
+  { id: "codigo",       label: "Código proveedor", requerido: false },
+  { id: "nombre",       label: "Nombre",            requerido: true  },
+  { id: "categoria",    label: "Categoría",          requerido: false },
+  { id: "marca",        label: "Marca",             requerido: false },
+  { id: "proveedor",    label: "Proveedor",          requerido: false },
+  { id: "precio_costo", label: "Precio costo",       requerido: true  },
+  { id: "precio_lista", label: "Precio lista sugerido", requerido: false },
+  { id: "precio_venta", label: "Precio de venta",    requerido: false },
+  { id: "stock",        label: "Stock",             requerido: false },
+  { id: "ignorar",      label: "— Ignorar columna —", requerido: false },
+];
+
+const CATEGORIAS_LUB = [
+  'aceites','filtros','bujias','frenos','refrigerante','aditivos','accesorios','escobillas'
+];
+
 
 export default function ImportadorPage() {
   return (
@@ -23,7 +41,10 @@ export default function ImportadorPage() {
 function ImportadorContent() {
   const { sesion, onCambiarUsuario } = useAuth();
 
-  const [paso, setPaso] = useState(1); // 1=subir, 2=mapear, 3=preview, 4=listo
+  const [modo, setModo] = useState('gomeria'); // 'gomeria' | 'lubricentro'
+  const CAMPOS_DESTINO = modo === 'lubricentro' ? CAMPOS_LUBRICENTRO : CAMPOS_GOMERIA;
+
+  const [paso, setPaso] = useState(1);
   const [archivo, setArchivo] = useState(null);
   const [columnas, setColumnas] = useState([]);
   const [filas, setFilas] = useState([]);
@@ -67,16 +88,19 @@ function ImportadorContent() {
         setColumnas(headers);
         setFilas(rows);
 
-        // Auto-mapeo inteligente
         const autoMapeo = {};
         headers.forEach((h, i) => {
           const hl = h.toLowerCase();
-          if (hl.includes("cod") || hl === "id") autoMapeo[i] = "codigo";
+          if (hl.includes("cod") || hl === "id")                                    autoMapeo[i] = "codigo";
           else if (hl.includes("desc") || hl.includes("nom") || hl.includes("art") || hl.includes("prod")) autoMapeo[i] = "nombre";
           else if (hl.includes("cat") || hl.includes("rub") || hl.includes("tipo")) autoMapeo[i] = "categoria";
-          else if (hl.includes("venta") || hl.includes("pvp") || hl.includes("precio") || hl.includes("oferta")) autoMapeo[i] = "precio";
-          else if (hl.includes("cost") || hl.includes("valor")) autoMapeo[i] = "precio";
-          else autoMapeo[i] = "ignorar";
+          else if (hl.includes("marc"))                                             autoMapeo[i] = "marca";
+          else if (hl.includes("prov"))                                             autoMapeo[i] = "proveedor";
+          else if (hl.includes("costo") || hl.includes("cost"))                    autoMapeo[i] = "precio_costo";
+          else if (hl.includes("lista") || hl.includes("suger"))                   autoMapeo[i] = "precio_lista";
+          else if (hl.includes("venta") || hl.includes("pvp") || hl.includes("precio")) autoMapeo[i] = modo === 'lubricentro' ? "precio_venta" : "precio";
+          else if (hl.includes("stock"))                                            autoMapeo[i] = "stock";
+          else                                                                       autoMapeo[i] = "ignorar";
         });
         setMapeo(autoMapeo);
         setPaso(2);
@@ -95,22 +119,41 @@ function ImportadorContent() {
   };
 
   const generarPreview = () => {
-    const tieneNombre = Object.values(mapeo).includes("nombre");
-    const tienePrecio = Object.values(mapeo).includes("precio");
-    if (!tieneNombre || !tienePrecio) {
-      setError("Tenés que mapear al menos Nombre y Precio.");
-      return;
+    const requeridos = modo === 'lubricentro'
+      ? ['nombre', 'precio_costo']
+      : ['nombre', 'precio'];
+    for (const r of requeridos) {
+      if (!Object.values(mapeo).includes(r)) {
+        setError(`Tenés que mapear al menos: ${requeridos.join(' y ')}.`);
+        return;
+      }
     }
     setError("");
     const colByField = {};
     Object.entries(mapeo).forEach(([idx, field]) => { if (field !== "ignorar") colByField[field] = Number(idx); });
-    const items = filas.slice(0, 200).map((row) => ({
-      codigo: row[colByField.codigo] != null ? String(row[colByField.codigo]).trim() : "",
-      nombre: row[colByField.nombre] != null ? String(row[colByField.nombre]).trim() : "",
-      categoria: row[colByField.categoria] != null ? String(row[colByField.categoria]).trim() : "",
-      precio: row[colByField.precio] != null ? String(row[colByField.precio]).replace(/[^0-9.,]/g, "").replace(",", ".") : "",
-      activo: "true",
-    })).filter((i) => i.nombre && i.precio);
+
+    const items = filas.slice(0, 500).map((row) => {
+      const base = {
+        codigo:   row[colByField.codigo]   != null ? String(row[colByField.codigo]).trim()   : "",
+        nombre:   row[colByField.nombre]   != null ? String(row[colByField.nombre]).trim()   : "",
+        categoria: row[colByField.categoria] != null ? String(row[colByField.categoria]).trim() : "",
+      };
+      if (modo === 'lubricentro') {
+        base.marca      = row[colByField.marca]      != null ? String(row[colByField.marca]).trim()      : "";
+        base.proveedor  = row[colByField.proveedor]  != null ? String(row[colByField.proveedor]).trim()  : "";
+        base.precio_costo = row[colByField.precio_costo] != null ? String(row[colByField.precio_costo]).replace(/[^0-9.,]/g,'').replace(',','.') : "";
+        base.precio_lista = row[colByField.precio_lista] != null ? String(row[colByField.precio_lista]).replace(/[^0-9.,]/g,'').replace(',','.') : "";
+        base.precio_venta = row[colByField.precio_venta] != null ? String(row[colByField.precio_venta]).replace(/[^0-9.,]/g,'').replace(',','.') : "";
+        base.stock      = row[colByField.stock]      != null ? String(row[colByField.stock]).replace(/[^0-9]/g,'') : "0";
+        // Normalizar categoría
+        const catNorm = base.categoria.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,'');
+        base.categoria = CATEGORIAS_LUB.find(c => catNorm.startsWith(c.replace('bujias','buji'))) || 'accesorios';
+      } else {
+        base.precio = row[colByField.precio] != null ? String(row[colByField.precio]).replace(/[^0-9.,]/g,'').replace(',','.') : "";
+        base.activo = "true";
+      }
+      return base;
+    }).filter((i) => i.nombre && (modo === 'lubricentro' ? i.precio_costo : i.precio));
     setPreview(items);
     setPaso(3);
   };
@@ -119,7 +162,11 @@ function ImportadorContent() {
     setImportando(true);
     setError("");
     try {
-      const res = await fetch("/api/productos/importar", {
+      const endpoint = modo === 'lubricentro'
+        ? '/api/productos/importar-lubricentro'
+        : '/api/productos/importar';
+      const bodyKey  = modo === 'lubricentro' ? 'productos' : 'productos';
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productos: preview }),
@@ -160,6 +207,16 @@ function ImportadorContent() {
           <div>
             <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 20, fontWeight: 800, color: "#fff", letterSpacing: 1 }}>FB LUBRICENTRO</div>
             <div style={{ fontSize: 10, color: "#444", letterSpacing: 3 }}>IMPORTADOR DE PRODUCTOS · ANTIGRAVITY</div>
+          </div>
+          <div style={{ width: 1, height: 32, background: "#1e1e1e" }} />
+          {/* Selector de modo */}
+          <div style={{ display: "flex", gap: 4 }}>
+            {[{ id: 'gomeria', label: '⚙️ Gomería' }, { id: 'lubricentro', label: '🪢 Lubricentro' }].map((m) => (
+              <button key={m.id} onClick={() => { setModo(m.id); reiniciar(); }}
+                style={{ padding: '5px 14px', borderRadius: 6, border: 'none', background: modo === m.id ? '#2563eb' : 'transparent', color: modo === m.id ? '#fff' : '#555', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                {m.label}
+              </button>
+            ))}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -278,23 +335,44 @@ function ImportadorContent() {
           <div className="fade-up">
             <div style={{ fontSize: 22, fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 800, marginBottom: 4 }}>Previsualización</div>
             <div style={{ fontSize: 13, color: "#555", marginBottom: 24 }}>
-              Se van a importar <strong style={{ color: "#fff" }}>{preview.length} productos</strong>. Verificá que los datos sean correctos antes de confirmar.
+              Se van a importar <strong style={{ color: "#fff" }}>{preview.length} productos</strong>{modo === 'lubricentro' ? ' al catálogo lubricentro' : ''}. Verificá que los datos sean correctos antes de confirmar.
             </div>
 
             <div style={{ background: "#111", borderRadius: 12, overflow: "hidden", border: "1px solid #1e1e1e", marginBottom: 20 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 120px 80px", gap: 0, padding: "10px 16px", borderBottom: "1px solid #1e1e1e", fontSize: 10, color: "#444", letterSpacing: 2, textTransform: "uppercase", fontWeight: 600 }}>
-                <span>Código</span><span>Nombre</span><span>Categoría</span><span style={{ textAlign: "right" }}>Precio</span>
-              </div>
-              <div style={{ maxHeight: 340, overflowY: "auto" }}>
-                {preview.map((p, i) => (
-                  <div key={i} style={{ display: "grid", gridTemplateColumns: "100px 1fr 120px 80px", gap: 0, padding: "10px 16px", borderBottom: i < preview.length - 1 ? "1px solid #141414" : "none", alignItems: "center" }}>
-                    <div style={{ fontSize: 11, color: "#555", fontFamily: "monospace" }}>{p.codigo || "—"}</div>
-                    <div style={{ fontSize: 13, color: "#ddd", fontWeight: 500 }}>{p.nombre}</div>
-                    <div style={{ fontSize: 12, color: "#666" }}>{p.categoria || "—"}</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#3b82f6", textAlign: "right", fontFamily: "'Barlow Condensed',sans-serif" }}>${Number(p.precio).toLocaleString("es-AR")}</div>
+              {modo === 'lubricentro' ? (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 100px 90px 90px", gap: 0, padding: "10px 16px", borderBottom: "1px solid #1e1e1e", fontSize: 10, color: "#444", letterSpacing: 2, textTransform: "uppercase", fontWeight: 600 }}>
+                    <span>Código</span><span>Nombre</span><span>Categoría</span><span style={{ textAlign: "right" }}>Costo</span><span style={{ textAlign: "right" }}>Venta</span>
                   </div>
-                ))}
-              </div>
+                  <div style={{ maxHeight: 340, overflowY: "auto" }}>
+                    {preview.map((p, i) => (
+                      <div key={i} style={{ display: "grid", gridTemplateColumns: "120px 1fr 100px 90px 90px", gap: 0, padding: "10px 16px", borderBottom: i < preview.length - 1 ? "1px solid #141414" : "none", alignItems: "center" }}>
+                        <div style={{ fontSize: 11, color: "#555", fontFamily: "monospace" }}>{p.codigo || "—"}</div>
+                        <div style={{ fontSize: 13, color: "#ddd", fontWeight: 500 }}>{p.nombre}</div>
+                        <div style={{ fontSize: 11, color: "#666" }}>{p.categoria || "—"}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b", textAlign: "right", fontFamily: "'Barlow Condensed',sans-serif" }}>${Number(p.precio_costo || 0).toLocaleString('es-AR')}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#3b82f6", textAlign: "right", fontFamily: "'Barlow Condensed',sans-serif" }}>{p.precio_venta ? '$' + Number(p.precio_venta).toLocaleString('es-AR') : <span style={{ color: '#444' }}>auto</span>}</div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 120px 80px", gap: 0, padding: "10px 16px", borderBottom: "1px solid #1e1e1e", fontSize: 10, color: "#444", letterSpacing: 2, textTransform: "uppercase", fontWeight: 600 }}>
+                    <span>Código</span><span>Nombre</span><span>Categoría</span><span style={{ textAlign: "right" }}>Precio</span>
+                  </div>
+                  <div style={{ maxHeight: 340, overflowY: "auto" }}>
+                    {preview.map((p, i) => (
+                      <div key={i} style={{ display: "grid", gridTemplateColumns: "100px 1fr 120px 80px", gap: 0, padding: "10px 16px", borderBottom: i < preview.length - 1 ? "1px solid #141414" : "none", alignItems: "center" }}>
+                        <div style={{ fontSize: 11, color: "#555", fontFamily: "monospace" }}>{p.codigo || "—"}</div>
+                        <div style={{ fontSize: 13, color: "#ddd", fontWeight: 500 }}>{p.nombre}</div>
+                        <div style={{ fontSize: 12, color: "#666" }}>{p.categoria || "—"}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#3b82f6", textAlign: "right", fontFamily: "'Barlow Condensed',sans-serif" }}>${Number(p.precio).toLocaleString("es-AR")}</div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             <div style={{ display: "flex", gap: 10 }}>
@@ -302,7 +380,7 @@ function ImportadorContent() {
               <button onClick={importar} disabled={importando} style={{ flex: 1, padding: "12px", background: importando ? "#1a1a1a" : "#16a34a", border: "none", borderRadius: 8, color: importando ? "#333" : "#fff", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 17, fontWeight: 800, cursor: importando ? "not-allowed" : "pointer", letterSpacing: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                 {importando ? (
                   <><span style={{ width: 16, height: 16, border: "2px solid #444", borderTopColor: "#888", borderRadius: "50%", display: "inline-block" }} className="spin"></span> Importando...</>
-                ) : `✓ IMPORTAR ${preview.length} PRODUCTOS`}
+                ) : `✓ IMPORTAR ${preview.length} PRODUCTOS${modo === 'lubricentro' ? ' AL LUBRICENTRO' : ''}`}
               </button>
             </div>
           </div>
@@ -316,7 +394,7 @@ function ImportadorContent() {
               ¡Importación exitosa!
             </div>
             <div style={{ fontSize: 15, color: "#555", marginBottom: 32 }}>
-              Se importaron <strong style={{ color: "#fff" }}>{resultado?.importados || preview.length} productos</strong> al catálogo.
+              Se importaron <strong style={{ color: "#fff" }}>{resultado?.importados || preview.length} productos</strong>{resultado?.actualizados ? ` · ${resultado.actualizados} actualizados` : ''} al catálogo{modo === 'lubricentro' ? ' lubricentro' : ''}.
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
               <button onClick={reiniciar} style={{ padding: "12px 24px", background: "#111", border: "1px solid #222", borderRadius: 8, color: "#ccc", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
