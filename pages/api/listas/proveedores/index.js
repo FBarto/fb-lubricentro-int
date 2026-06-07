@@ -24,6 +24,7 @@ export default async function handler(req, res) {
       const {
         id, nombre, margen_default = '40',
         categoria_default = 'accesorios',
+        descuento_default = '0',
         mapeo_columnas = '{}',
       } = req.body;
 
@@ -49,6 +50,7 @@ export default async function handler(req, res) {
         typeof mapeo_columnas === 'string' ? mapeo_columnas : JSON.stringify(mapeo_columnas),
         '',  // ultima_importacion
         '0', // productos_actualizados
+        String(descuento_default), // descuento_default
       ]);
 
       return res.status(201).json({ ok: true });

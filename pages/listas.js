@@ -49,6 +49,7 @@ function ListasContent() {
   const [modalPaso, setModalPaso]         = useState(1);    // 1=config, 2=mapeo, 3=preview, 4=listo
   const [provSel, setProvSel]             = useState('');
   const [margen, setMargen]               = useState(40);
+  const [descuento, setDescuento]         = useState(0);
   const [modo, setModo]                   = useState('solo_precios');
   const [columnas, setColumnas]           = useState([]);
   const [filas, setFilas]                 = useState([]);
@@ -64,7 +65,7 @@ function ListasContent() {
 
   // ── Modal de nuevo proveedor ──────────────────────────────────────────────
   const [showNuevoProv, setShowNuevoProv] = useState(false);
-  const [nuevoProv, setNuevoProv]         = useState({ id: '', nombre: '', margen_default: '40', categoria_default: 'aceites' });
+  const [nuevoProv, setNuevoProv]         = useState({ id: '', nombre: '', margen_default: '40', descuento_default: '0', categoria_default: 'aceites' });
   const [creandoProv, setCreandoProv]     = useState(false);
   const [errorNuevoProv, setErrorNuevoProv] = useState('');
 
@@ -115,6 +116,7 @@ function ListasContent() {
     setModalPaso(1);
     setProvSel('');
     setMargen(40);
+    setDescuento(0);
     setModo('solo_precios');
     setColumnas([]);
     setFilas([]);
@@ -139,6 +141,7 @@ function ListasContent() {
     setModalPaso(1);
     setProvSel('');
     setMargen(40);
+    setDescuento(0);
     setModo('solo_precios');
     setColumnas([]);
     setFilas([]);
@@ -177,14 +180,21 @@ function ListasContent() {
         setTotalFilas(data.total_filas || 0);
         setAdvertencia(data.advertencia || '');
 
-        // Si tiene perfil guardado → ir directo a previsualización
-        if (data.perfil?.mapeo_columnas && provSel) {
-          const m = typeof data.mapeo === 'object' ? data.mapeo : {};
-          const prev = generarPreview(data.filas || [], data.columnas || [], m, margen);
-          if (prev.length > 0) {
-            setPreview(prev);
-            setModalPaso(3);
-            return;
+        if (data.perfil) {
+          const finalMargen = Number(data.perfil.margen_default) || 40;
+          const finalDescuento = Number(data.perfil.descuento_default) || 0;
+          setMargen(finalMargen);
+          setDescuento(finalDescuento);
+
+          // Si tiene perfil guardado → ir directo a previsualización
+          if (data.perfil.mapeo_columnas && provSel) {
+            const m = typeof data.mapeo === 'object' ? data.mapeo : {};
+            const prev = generarPreview(data.filas || [], data.columnas || [], m, finalMargen, finalDescuento);
+            if (prev.length > 0) {
+              setPreview(prev);
+              setModalPaso(3);
+              return;
+            }
           }
         }
 
@@ -234,8 +244,8 @@ function ListasContent() {
 
   // ─── Paso 2 → 3: generar previsualización ──────────────────────────────────
   const irAPreview = () => {
-    if (!Object.values(mapeo).includes('precio_costo')) {
-      setErrorModal('Tenés que mapear al menos la columna de Precio Costo.');
+    if (!Object.values(mapeo).includes('precio_costo') && !Object.values(mapeo).includes('precio_lista')) {
+      setErrorModal('Tenés que mapear al menos la columna de Precio Costo o la columna de Precio Lista.');
       return;
     }
     if (!Object.values(mapeo).includes('nombre')) {
@@ -243,7 +253,7 @@ function ListasContent() {
       return;
     }
     setErrorModal('');
-    const prev = generarPreview(filas, columnas, mapeo, margen);
+    const prev = generarPreview(filas, columnas, mapeo, margen, descuento);
     setPreview(prev);
     setModalPaso(3);
   };
@@ -260,6 +270,7 @@ function ListasContent() {
           productos: preview,
           proveedor_id: provSel || undefined,
           margen,
+          descuento,
           modo,
           file_id: modalArchivo.fuente === 'drive' ? modalArchivo.id : undefined,
           guardar_mapeo: guardarMapeo,
@@ -297,7 +308,7 @@ function ListasContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al crear proveedor');
       setShowNuevoProv(false);
-      setNuevoProv({ id: '', nombre: '', margen_default: '40', categoria_default: 'aceites' });
+      setNuevoProv({ id: '', nombre: '', margen_default: '40', descuento_default: '0', categoria_default: 'aceites' });
       cargarProveedores();
     } catch (err) {
       setErrorNuevoProv(err.message);
@@ -327,7 +338,15 @@ function ListasContent() {
   const actualizarMargen = (nuevoMargen) => {
     setMargen(nuevoMargen);
     if (modalPaso === 3 && filas.length > 0) {
-      setPreview(generarPreview(filas, columnas, mapeo, nuevoMargen));
+      setPreview(generarPreview(filas, columnas, mapeo, nuevoMargen, descuento));
+    }
+  };
+
+  // Cuando cambia el descuento en el paso 3, recalcular preview
+  const actualizarDescuento = (nuevoDescuento) => {
+    setDescuento(nuevoDescuento);
+    if (modalPaso === 3 && filas.length > 0) {
+      setPreview(generarPreview(filas, columnas, mapeo, margen, nuevoDescuento));
     }
   };
 
@@ -488,7 +507,10 @@ function ListasContent() {
                     <div style={{ fontSize: 18, marginBottom: 8 }}>🏭</div>
                     <div style={{ fontSize: 15, fontWeight: 700, color: '#e5e7eb', marginBottom: 4 }}>{p.nombre}</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-                      <div style={{ fontSize: 11, color: '#555' }}>Margen: <span style={{ color: '#3b82f6', fontWeight: 700 }}>{p.margen_default}%</span></div>
+                      <div style={{ fontSize: 11, color: '#555' }}>Margen default: <span style={{ color: '#3b82f6', fontWeight: 700 }}>{p.margen_default}%</span></div>
+                      {p.descuento_default != null && Number(p.descuento_default) > 0 && (
+                        <div style={{ fontSize: 11, color: '#555' }}>Descuento default: <span style={{ color: '#ef4444', fontWeight: 700 }}>{p.descuento_default}%</span></div>
+                      )}
                       <div style={{ fontSize: 11, color: '#555' }}>Categoría: <span style={{ color: '#888' }}>{p.categoria_default || '—'}</span></div>
                       {p.ultima_importacion && <div style={{ fontSize: 11, color: '#555' }}>Última: <span style={{ color: '#888' }}>{p.ultima_importacion}</span></div>}
                       {p.productos_actualizados && Number(p.productos_actualizados) > 0 && (
@@ -553,7 +575,10 @@ function ListasContent() {
                     <select value={provSel} onChange={(e) => {
                       setProvSel(e.target.value);
                       const p = proveedores.find((x) => x.id === e.target.value);
-                      if (p) setMargen(Number(p.margen_default) || 40);
+                      if (p) {
+                        setMargen(Number(p.margen_default) || 40);
+                        setDescuento(Number(p.descuento_default) || 0);
+                      }
                     }} style={{ width: '100%' }}>
                       <option value="">— Sin perfil de proveedor —</option>
                       {proveedores.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
@@ -570,6 +595,18 @@ function ListasContent() {
                     />
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#444', marginTop: 4 }}>
                       <span>0%</span><span>75%</span><span>150%</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={S.label}>Descuento sobre lista (opcional): <span style={{ color: '#ef4444', fontWeight: 700 }}>{descuento}%</span></label>
+                    <input
+                      type="range" min={0} max={90} value={descuento}
+                      style={{ '--val': `${descuento / 90 * 100}%` }}
+                      onChange={(e) => setDescuento(Number(e.target.value))}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#444', marginTop: 4 }}>
+                      <span>0%</span><span>45%</span><span>90%</span>
                     </div>
                   </div>
 
@@ -632,10 +669,16 @@ function ListasContent() {
                     </label>
                   )}
 
-                  {/* Ajuste de margen en el paso 2 */}
-                  <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '14px 16px' }}>
-                    <label style={S.label}>Margen: <span style={{ color: '#3b82f6', fontWeight: 700 }}>{margen}%</span></label>
-                    <input type="range" min={0} max={150} value={margen} style={{ '--val': `${margen / 150 * 100}%` }} onChange={(e) => setMargen(Number(e.target.value))} />
+                  {/* Ajuste de margen y descuento en el paso 2 */}
+                  <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div>
+                      <label style={S.label}>Margen: <span style={{ color: '#3b82f6', fontWeight: 700 }}>{margen}%</span></label>
+                      <input type="range" min={0} max={150} value={margen} style={{ '--val': `${margen / 150 * 100}%` }} onChange={(e) => setMargen(Number(e.target.value))} />
+                    </div>
+                    <div>
+                      <label style={S.label}>Descuento sobre lista: <span style={{ color: '#ef4444', fontWeight: 700 }}>{descuento}%</span></label>
+                      <input type="range" min={0} max={90} value={descuento} style={{ '--val': `${descuento / 90 * 100}%` }} onChange={(e) => setDescuento(Number(e.target.value))} />
+                    </div>
                   </div>
 
                   <div style={{ display: 'flex', gap: 10 }}>
@@ -650,13 +693,22 @@ function ListasContent() {
               {/* ── PASO 3: Previsualizar ────────────────────────────────────── */}
               {modalPaso === 3 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {/* Ajuste rápido de margen */}
-                  <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <div style={{ fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>Margen:</div>
-                    <input type="range" min={0} max={150} value={margen} style={{ flex: 1, '--val': `${margen / 150 * 100}%` }} onChange={(e) => actualizarMargen(Number(e.target.value))} />
-                    <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 22, fontWeight: 800, color: '#3b82f6', width: 52, textAlign: 'right' }}>{margen}%</div>
-                    <input type="number" min={0} max={200} value={margen} onChange={(e) => actualizarMargen(Number(e.target.value))}
-                      style={{ width: 64, fontSize: 13, padding: '6px 10px' }} />
+                  {/* Ajuste rápido de margen y descuento */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                      <div style={{ fontSize: 12, color: '#888', whiteSpace: 'nowrap', width: 70 }}>Margen:</div>
+                      <input type="range" min={0} max={150} value={margen} style={{ flex: 1, '--val': `${margen / 150 * 100}%` }} onChange={(e) => actualizarMargen(Number(e.target.value))} />
+                      <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 22, fontWeight: 800, color: '#3b82f6', width: 52, textAlign: 'right' }}>{margen}%</div>
+                      <input type="number" min={0} max={200} value={margen} onChange={(e) => actualizarMargen(Number(e.target.value))}
+                        style={{ width: 64, fontSize: 13, padding: '6px 10px' }} />
+                    </div>
+                    <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                      <div style={{ fontSize: 12, color: '#888', whiteSpace: 'nowrap', width: 70 }}>Descuento:</div>
+                      <input type="range" min={0} max={90} value={descuento} style={{ flex: 1, '--val': `${descuento / 90 * 100}%` }} onChange={(e) => actualizarDescuento(Number(e.target.value))} />
+                      <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 22, fontWeight: 800, color: '#ef4444', width: 52, textAlign: 'right' }}>{descuento}%</div>
+                      <input type="number" min={0} max={99} value={descuento} onChange={(e) => actualizarDescuento(Number(e.target.value))}
+                        style={{ width: 64, fontSize: 13, padding: '6px 10px' }} />
+                    </div>
                   </div>
 
                   <div style={{ fontSize: 13, color: '#555' }}>
@@ -767,6 +819,10 @@ function ListasContent() {
                 <input type="number" min={0} max={200} value={nuevoProv.margen_default} onChange={(e) => setNuevoProv({ ...nuevoProv, margen_default: e.target.value })} style={{ width: '100%' }} />
               </div>
               <div>
+                <label style={S.label}>Descuento por defecto (%)</label>
+                <input type="number" min={0} max={99} value={nuevoProv.descuento_default} onChange={(e) => setNuevoProv({ ...nuevoProv, descuento_default: e.target.value })} style={{ width: '100%' }} />
+              </div>
+              <div>
                 <label style={S.label}>Categoría por defecto</label>
                 <select value={nuevoProv.categoria_default} onChange={(e) => setNuevoProv({ ...nuevoProv, categoria_default: e.target.value })} style={{ width: '100%' }}>
                   {CATEGORIAS.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -823,11 +879,12 @@ function autoMapear(columnas) {
   return mapeo;
 }
 
-function generarPreview(filas, columnas, mapeo, margen) {
+function generarPreview(filas, columnas, mapeo, margen, descuento = 0) {
   const colByField = {};
   Object.entries(mapeo).forEach(([idx, field]) => { if (field !== 'ignorar') colByField[field] = Number(idx); });
 
   const margenNum = Number(margen) || 40;
+  const descuentoNum = Number(descuento) || 0;
 
   return filas.slice(0, 500).map((row) => {
     const nombre = colByField.nombre != null && row[colByField.nombre] != null ? String(row[colByField.nombre]).trim() : '';
@@ -839,8 +896,11 @@ function generarPreview(filas, columnas, mapeo, margen) {
     const rawLista = colByField.precio_lista != null && row[colByField.precio_lista] != null
       ? String(row[colByField.precio_lista]).replace(/[^0-9.,]/g, '').replace(',', '.') : '';
 
-    const precio_costo = parseFloat(rawCosto) || 0;
     const precio_lista = parseFloat(rawLista) || 0;
+    let precio_costo = parseFloat(rawCosto) || 0;
+    if (precio_costo === 0 && precio_lista > 0) {
+      precio_costo = precio_lista * (1 - descuentoNum / 100);
+    }
     const precio_venta_calc = precio_costo > 0 ? Math.ceil(precio_costo * (1 + margenNum / 100)) : 0;
 
     return { codigo, nombre, marca, precio_costo, precio_lista, precio_venta_calc };

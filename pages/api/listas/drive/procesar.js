@@ -1,6 +1,7 @@
 import { getDriveClient, descargarArchivo } from '../../../../lib/drive';
 import { getSheetsClient, getRows } from '../../../../lib/sheets';
 import * as XLSX from 'xlsx';
+import { parsearPDF } from '../../../../lib/pdf-parser';
 
 /**
  * POST /api/listas/drive/procesar
@@ -80,72 +81,7 @@ export default async function handler(req, res) {
   }
 }
 
-// ─── Parsear PDF ──────────────────────────────────────────────────────────────
-async function parsearPDF(buffer) {
-  // Importación dinámica para evitar problemas de SSR con pdf-parse
-  const pdfParse = (await import('pdf-parse')).default;
 
-  let data;
-  try {
-    data = await pdfParse(buffer);
-  } catch {
-    return { columnas: [], filas: [], advertencia: 'No se pudo leer el PDF. ¿Es un archivo escaneado?' };
-  }
-
-  const texto = data.text || '';
-
-  // Detectar si es un PDF escaneado (poco texto para el número de páginas)
-  const palabras = texto.trim().split(/\s+/).length;
-  if (palabras < 50) {
-    return {
-      columnas: ['(sin datos)'],
-      filas: [],
-      advertencia: 'El PDF parece ser una imagen escaneada. No se puede extraer texto automáticamente.',
-    };
-  }
-
-  // Procesar líneas: buscar filas con precios
-  const lineas = texto.split('\n').map((l) => l.trim()).filter(Boolean);
-  const filasParsadas = [];
-
-  for (const linea of lineas) {
-    // Buscar líneas que contengan al menos un número que parezca precio (> 100)
-    const numeros = linea.match(/[\d.,]+/g) || [];
-    const precios = numeros
-      .map((n) => parseFloat(n.replace(/\./g, '').replace(',', '.')))
-      .filter((n) => !isNaN(n) && n >= 100 && n < 10_000_000);
-
-    if (precios.length === 0) continue;
-
-    // Intentar separar código | nombre | precio
-    // Formato típico: "COD123  Nombre del producto  $1.500,00"
-    const partes = linea.split(/\s{2,}|\t/).map((p) => p.trim()).filter(Boolean);
-
-    if (partes.length >= 2) {
-      filasParsadas.push(partes);
-    }
-  }
-
-  if (filasParsadas.length === 0) {
-    return {
-      columnas: ['Línea completa'],
-      filas: lineas.filter((l) => /\d{3,}/.test(l)).map((l) => [l]),
-      advertencia: 'No se detectó estructura de tabla clara. Revisá el mapeo de columnas.',
-    };
-  }
-
-  // Normalizar: todas las filas al mismo ancho
-  const maxCols = Math.max(...filasParsadas.map((r) => r.length));
-  const columnas = Array.from({ length: maxCols }, (_, i) => `Columna ${i + 1}`);
-
-  // Intentar detectar si la primera fila es un encabezado
-  const primeraFila = filasParsadas[0];
-  const esCabecera = primeraFila.every((c) => !/^\d/.test(c) && isNaN(parseFloat(c)));
-  const columnasFinales = esCabecera ? primeraFila : columnas;
-  const filasFinales = esCabecera ? filasParsadas.slice(1) : filasParsadas;
-
-  return { columnas: columnasFinales, filas: filasFinales, advertencia: null };
-}
 
 // ─── Detectar cabecera en Excel/CSV ───────────────────────────────────────────
 function detectarCabeceraYFilas(json) {

@@ -12,12 +12,13 @@ export default async function handler(req, res) {
 
     // ── PUT ───────────────────────────────────────────────────────────────────
     if (req.method === 'PUT') {
-      const { nombre, margen_default, categoria_default, mapeo_columnas } = req.body;
+      const { nombre, margen_default, categoria_default, descuento_default, mapeo_columnas } = req.body;
 
       const updates = {};
       if (nombre !== undefined)            updates.nombre = nombre;
       if (margen_default !== undefined)    updates.margen_default = String(margen_default);
       if (categoria_default !== undefined) updates.categoria_default = categoria_default;
+      if (descuento_default !== undefined) updates.descuento_default = String(descuento_default);
       if (mapeo_columnas !== undefined) {
         updates.mapeo_columnas = typeof mapeo_columnas === 'string'
           ? mapeo_columnas

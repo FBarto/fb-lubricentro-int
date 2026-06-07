@@ -25,6 +25,7 @@ export default async function handler(req, res) {
     productos = [],
     proveedor_id,
     margen = 40,
+    descuento = 0,
     modo = 'solo_precios',
     file_id,
     guardar_mapeo = false,
@@ -130,10 +131,14 @@ export default async function handler(req, res) {
           ultima_importacion: hoy,
           productos_actualizados: String(resumen.actualizados + resumen.creados),
         };
-        if (guardar_mapeo && mapeo_columnas) {
-          updates.mapeo_columnas = typeof mapeo_columnas === 'string'
-            ? mapeo_columnas
-            : JSON.stringify(mapeo_columnas);
+        if (guardar_mapeo) {
+          updates.margen_default = String(margen);
+          updates.descuento_default = String(descuento);
+          if (mapeo_columnas) {
+            updates.mapeo_columnas = typeof mapeo_columnas === 'string'
+              ? mapeo_columnas
+              : JSON.stringify(mapeo_columnas);
+          }
         }
         await updateRowWhere(sheets, 'proveedores_lubricentro', 'id', proveedor_id, updates);
       } catch { /* El proveedor puede no existir todavía */ }

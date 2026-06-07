@@ -534,5 +534,27 @@ Para permitir editar filas, columnas y categorías rápidamente antes de confirm
 
 ---
 
-*Documentación actualizada: 04/06/2026*
+## 23. Sprint 7 — Carga de Listas de Precios por Proveedor & Motor PDF Inteligente
+
+Se implementó el módulo completo de `/listas` para la gestión rápida de listas de precios de lubricantes y repuestos.
+
+### 23.1. Funcionalidades del Módulo
+1. **Bandeja Drive & Subida Manual**: Consulta archivos pendientes en una carpeta de Drive compartida o acepta subidas manuales por arrastre de Excel, CSV o PDF.
+2. **Fórmulas de Descuento por Proveedor**: Mapeo flexible que permite calcular automáticamente el precio de costo a partir del precio de lista con la fórmula:
+   $$\text{Precio Costo} = \text{Precio Lista} \times \left(1 - \frac{\text{Descuento}}{100}\right)$$
+3. **Persistencia de Preferencias**: Guarda automáticamente el margen de ganancia, el descuento por defecto y los mapeos de columnas de manera independiente por proveedor.
+
+### 23.2. Motor PDF por Coordenadas Visuales (`lib/pdf-parser.js`)
+Dado que los archivos PDF carecen de noción de celdas o tablas en su flujo de datos, implementamos un motor de agrupamiento bidimensional basado en **Mozilla PDF.js** (`pdfjs-dist/legacy`):
+- **Filas**: Agrupa caracteres sobre el mismo eje horizontal si su coordenada `Y` difiere por $\le 4$ puntos de tolerancia.
+- **Columnas (Clustering)**: Agrupa y auto-descubre las columnas de la tabla agrupando coordenadas `X` con una tolerancia de $25$ puntos.
+- **Auto-Split de Código-Descripción**: Detecta si el primer elemento del PDF contiene un código (ej: `02-004-001-00003-20`) y separa el texto en dos columnas independientes de forma limpia.
+- **Compatibilidad con Node.js 24**: Incorpora polyfills de clase `DOMMatrix`, `Path2D` e `ImageData` en el backend para evitar errores de renderizado del lado de Next.js.
+
+### 23.3. Estructura de Base de Datos y Auto-Healing
+Se agregó el campo `descuento_default` a la hoja `proveedores_lubricentro`. Al consultar la lista, la app verifica de forma proactiva si la columna existe. Si falta, **realiza una actualización estructural del Google Sheet de forma transparente (Self-Healing)** sin interrumpir al usuario.
+
+---
+
+*Documentación actualizada: 07/06/2026*
 
