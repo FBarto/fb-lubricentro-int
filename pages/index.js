@@ -30,6 +30,10 @@ export default function Home() {
           style={{ padding: '24px 48px', background: '#1e1b4b', border: '2px solid #3730a3', borderRadius: 14, color: '#a5b4fc', fontSize: 22, fontWeight: 800, cursor: 'pointer', letterSpacing: 1 }}>
           ⚙️ ADMIN
         </button>
+        <button onClick={() => router.push('/listas')}
+          style={{ padding: '24px 48px', background: '#0f2a1a', border: '2px solid #14532d', borderRadius: 14, color: '#86efac', fontSize: 22, fontWeight: 800, cursor: 'pointer', letterSpacing: 1 }}>
+          📋 LISTAS
+        </button>
       </div>
     </div>
   );

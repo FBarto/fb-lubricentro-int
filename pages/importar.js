@@ -256,6 +256,20 @@ function ImportadorContent() {
       </div>
 
 
+      {/* Banner → /listas para lubricentro */}
+      {modo === 'lubricentro' && (
+        <div style={{ background: 'linear-gradient(135deg,#0f1f40,#1a1a2e)', borderBottom: '1px solid #1e3a8a30' }}>
+          <div style={{ maxWidth: 780, margin: '0 auto', padding: '10px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ fontSize: 13, color: '#93c5fd' }}>
+              💡 <strong>¿Actualizás listas de precios?</strong> Usá el módulo Listas — más rápido, soporta PDF y tiene perfiles de proveedor guardados.
+            </div>
+            <a href="/listas" style={{ background: '#1e3a8a', color: '#93c5fd', border: '1px solid #1e40af', borderRadius: 7, padding: '6px 14px', fontSize: 12, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              Ir a Listas →
+            </a>
+          </div>
+        </div>
+      )}
+
       <div style={{ maxWidth: 780, margin: "0 auto", padding: "32px 24px" }}>
 
         {/* Steps indicator */}
