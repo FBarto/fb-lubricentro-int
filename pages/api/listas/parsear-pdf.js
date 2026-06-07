@@ -1,5 +1,13 @@
 import { parsearPDF } from '../../../lib/pdf-parser';
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
+
 /**
  * POST /api/listas/parsear-pdf
  * Body: { base64: string } — el archivo PDF en base64
