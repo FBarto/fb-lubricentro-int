@@ -1,12 +1,11 @@
-import { getSheetsClient, getRows } from '../../../lib/sheets';
+import { getSheetsClient, getBatchRows } from '../../../lib/sheets';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
 
   try {
     const sheets = await getSheetsClient();
-    const ventas = await getRows(sheets, 'ventas');
-    const items = await getRows(sheets, 'venta_items');
+    const { ventas = [], venta_items: items = [] } = await getBatchRows(sheets, ['ventas', 'venta_items']);
 
     const pendientes = ventas
       .filter((v) => v.estado === 'pendiente')

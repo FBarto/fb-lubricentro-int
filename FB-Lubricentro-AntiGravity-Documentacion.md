@@ -547,6 +547,7 @@ Se implementó el módulo completo de `/listas` para la gestión rápida de list
 ### 23.2. Motor PDF por Coordenadas Visuales (`lib/pdf-parser.js`)
 Dado que los archivos PDF carecen de noción de celdas o tablas en su flujo de datos, implementamos un motor de agrupamiento bidimensional basado en **Mozilla PDF.js** (`pdfjs-dist/legacy`):
 - **Filas**: Agrupa caracteres sobre el mismo eje horizontal si su coordenada `Y` difiere por $\le 4$ puntos de tolerancia.
+- **Y-Coords**: Cada fila conserva su coordenada Y de origen (desde 0 en el borde inferior hasta ~900 en el superior).
 - **Columnas (Clustering)**: Agrupa y auto-descubre las columnas de la tabla agrupando coordenadas `X` con una tolerancia de $25$ puntos.
 - **Auto-Split de Código-Descripción**: Detecta si el primer elemento del PDF contiene un código (ej: `02-004-001-00003-20`) y separa el texto en dos columnas independientes de forma limpia.
 - **Compatibilidad con Node.js 24**: Incorpora polyfills de clase `DOMMatrix`, `Path2D` e `ImageData` en el backend para evitar errores de renderizado del lado de Next.js.
@@ -554,7 +555,41 @@ Dado que los archivos PDF carecen de noción de celdas o tablas en su flujo de d
 ### 23.3. Estructura de Base de Datos y Auto-Healing
 Se agregó el campo `descuento_default` a la hoja `proveedores_lubricentro`. Al consultar la lista, la app verifica de forma proactiva si la columna existe. Si falta, **realiza una actualización estructural del Google Sheet de forma transparente (Self-Healing)** sin interrumpir al usuario.
 
+### 23.4. Límites de Corte Y (Y-limits) y Reordenamiento del Paso 2
+Para filtrar zonas de ruido típicas de los PDFs (logos, títulos de cabecera, números de página en el pie de página), se implementó un sistema de límites verticales interactivo:
+1. **Límite Superior (Y máxima / Ignorar cabecera)**: Ignora filas con $y > \text{yLimiteSuperior}$ (por defecto 850).
+2. **Límite Inferior (Y mínima / Ignorar pie)**: Ignora filas con $y < \text{yLimiteInferior}$ (por defecto 30).
+3. **Reordenamiento UI**: En el Paso 2 (Mapear columnas), la sección de **Límites de Página** se renderiza arriba de todo (antes de la tabla de asignación de columnas) para permitir al usuario "recortar" visualmente el PDF primero.
+4. **Vista Previa en Tiempo Real (Primeras 15 filas)**: Se lista una previsualización de 15 filas con su coordenada Y. Las filas incluidas se muestran en **verde (INC)** y las excluidas se muestran **atenuadas y tachadas en rojo (EXC)** al mover los sliders.
+5. **Persistencia**: Los límites se guardan en el JSON de `mapeo_columnas` de la hoja `proveedores_lubricentro` al marcar *"Guardar este mapeo..."* y se cargan automáticamente al seleccionar el proveedor.
+
+### 23.5. Guía de Pruebas Relativas (Paso a Paso)
+
+#### Prueba A: Carga y Detección de Coordenadas
+1. Ir a `/listas`, subir manualmente un PDF (ej. `LISTA DE PRECIOS -MAYO 2026 F_compressed.pdf` o usar el botón **Procesar** del archivo en Drive).
+2. Seleccionar el proveedor (ej. `bardhal`) o elegir *"Sin perfil de proveedor"*.
+3. Presionar **LEER ARCHIVO**.
+4. **Resultado esperado**: La app pasa al Paso 2, detecta el número de columnas y carga la sección de límites al principio del modal.
+
+#### Prueba B: Ajuste Interactivo de Sliders Y (Header/Footer Cutoffs)
+1. Mover el slider de **Ignorar cabecera (Y máxima)** hacia la izquierda (bajar el valor). Observar que las filas con Y superior se marcan inmediatamente en rojo y tachado (`EXC`).
+2. Mover el slider de **Ignorar pie (Y mínima)** hacia la derecha (subir el valor). Observar que las filas con Y inferior se marcan en rojo y tachado (`EXC`).
+3. **Resultado esperado**: Los colores verde (`INC`) y rojo (`EXC`) alternan instantáneamente en la lista preview de 15 filas sin recargar el modal.
+
+#### Prueba C: Mapeo y Previsualización Filtrada (Paso 3)
+1. Con los límites ajustados (ej. Y-max = 840, Y-min = 35), asignar:
+   * Columna 1 → `Código proveedor`
+   * Columna 2 → `Nombre`
+   * Columna 13 (u otra con costos) → `Precio costo` o `Precio lista`
+2. Marcar la casilla **"Guardar este mapeo..."** y presionar **PREVISUALIZAR →**.
+3. **Resultado esperado**: La previsualización del Paso 3 muestra únicamente los productos válidos recortados, excluyendo cabeceras de tabla, fechas u otros textos de pie de página fuera de las coordenadas indicadas.
+
+#### Prueba D: Persistencia de Configuración
+1. Completar la importación o presionar cancelar.
+2. Cargar el mismo archivo nuevamente, seleccionar el mismo proveedor y presionar **LEER ARCHIVO**.
+3. **Resultado esperado**: El sistema carga los sliders Y y las asignaciones de columnas previamente guardadas directamente en el modal, permitiendo avanzar directo a la previsualización (Paso 3).
+
 ---
 
-*Documentación actualizada: 07/06/2026*
+*Documentación del Sprint 7 finalizada: 07/06/2026*
 

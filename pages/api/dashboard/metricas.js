@@ -1,4 +1,4 @@
-import { getSheetsClient, getRows } from '../../../lib/sheets';
+import { getSheetsClient, getBatchRows } from '../../../lib/sheets';
 
 function parseFechaAR(fechaStr) {
   if (!fechaStr || typeof fechaStr !== 'string') return null;
@@ -73,11 +73,11 @@ export default async function handler(req, res) {
 
   try {
     const sheets = await getSheetsClient();
-    const [ventas, items, productos] = await Promise.all([
-      getRows(sheets, 'ventas'),
-      getRows(sheets, 'venta_items'),
-      getRows(sheets, 'productos_gomeria'),
-    ]);
+    const {
+      ventas = [],
+      venta_items: items = [],
+      productos_gomeria: productos = [],
+    } = await getBatchRows(sheets, ['ventas', 'venta_items', 'productos_gomeria']);
 
     const cobradas = ventas.filter((v) => v.estado === 'cobrado' && v.fecha);
 

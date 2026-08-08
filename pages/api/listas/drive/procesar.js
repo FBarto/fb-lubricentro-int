@@ -25,6 +25,7 @@ export default async function handler(req, res) {
     // ── 2. Parsear según el tipo ─────────────────────────────────────────────
     let filas = [];
     let columnas = [];
+    let yCoords = [];
     let advertencia = null;
 
     const tipo = fileType || detectarTipo(fileName);
@@ -33,6 +34,7 @@ export default async function handler(req, res) {
       const resultado = await parsearPDF(buffer);
       filas = resultado.filas;
       columnas = resultado.columnas;
+      yCoords = resultado.yCoords || [];
       advertencia = resultado.advertencia;
     } else {
       // Excel o CSV
@@ -69,6 +71,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       columnas,
       filas: filas.slice(0, 500), // máximo 500 filas
+      yCoords: yCoords.slice(0, 500),
       total_filas: filas.length,
       mapeo: mapeo_auto,
       perfil,

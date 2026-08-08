@@ -62,6 +62,9 @@ function ListasContent() {
   const [guardarMapeo, setGuardarMapeo]   = useState(false);
   const [errorModal, setErrorModal]       = useState('');
   const [totalFilas, setTotalFilas]       = useState(0);
+  const [yLimiteSuperior, setYLimiteSuperior] = useState(850);
+  const [yLimiteInferior, setYLimiteInferior] = useState(30);
+  const [yCoords, setYCoords]             = useState([]);
 
   // ── Modal de nuevo proveedor ──────────────────────────────────────────────
   const [showNuevoProv, setShowNuevoProv] = useState(false);
@@ -127,6 +130,9 @@ function ListasContent() {
     setErrorModal('');
     setGuardarMapeo(false);
     setTotalFilas(0);
+    setYLimiteSuperior(850);
+    setYLimiteInferior(30);
+    setYCoords([]);
   };
 
   // ─── Abrir modal: archivo subido manualmente ────────────────────────────────
@@ -152,6 +158,9 @@ function ListasContent() {
     setErrorModal('');
     setGuardarMapeo(false);
     setTotalFilas(0);
+    setYLimiteSuperior(850);
+    setYLimiteInferior(30);
+    setYCoords([]);
   }, []);
 
   // ─── Paso 1 → 2: descargar/leer el archivo y parsear ───────────────────────
@@ -176,9 +185,24 @@ function ListasContent() {
 
         setColumnas(data.columnas || []);
         setFilas(data.filas || []);
-        setMapeo(data.mapeo || {});
         setTotalFilas(data.total_filas || 0);
         setAdvertencia(data.advertencia || '');
+        setYCoords(data.yCoords || []);
+
+        let ySup = 850;
+        let yInf = 30;
+        let cleanMapeo = {};
+
+        if (data.mapeo) {
+          Object.entries(data.mapeo).forEach(([k, v]) => {
+            if (k === 'yLimiteSuperior') ySup = Number(v);
+            else if (k === 'yLimiteInferior') yInf = Number(v);
+            else cleanMapeo[k] = v;
+          });
+        }
+        setMapeo(cleanMapeo);
+        setYLimiteSuperior(ySup);
+        setYLimiteInferior(yInf);
 
         if (data.perfil) {
           const finalMargen = Number(data.perfil.margen_default) || 40;
@@ -188,8 +212,16 @@ function ListasContent() {
 
           // Si tiene perfil guardado → ir directo a previsualización
           if (data.perfil.mapeo_columnas && provSel) {
-            const m = typeof data.mapeo === 'object' ? data.mapeo : {};
-            const prev = generarPreview(data.filas || [], data.columnas || [], m, finalMargen, finalDescuento);
+            const prev = generarPreview(
+              data.filas || [],
+              data.columnas || [],
+              cleanMapeo,
+              finalMargen,
+              finalDescuento,
+              data.yCoords || [],
+              ySup,
+              yInf
+            );
             if (prev.length > 0) {
               setPreview(prev);
               setModalPaso(3);
@@ -212,14 +244,63 @@ function ListasContent() {
             body: JSON.stringify({ base64 }),
           });
           const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Error parseando PDF');
           setColumnas(data.columnas || []);
           setFilas(data.filas || []);
           setTotalFilas(data.total_filas || 0);
           setAdvertencia(data.advertencia || '');
-          // Auto-mapeo básico para PDF
-          const m = {};
-          (data.columnas || []).forEach((_, i) => { m[i] = 'ignorar'; });
-          setMapeo(m);
+          setYCoords(data.yCoords || []);
+
+          let ySup = 850;
+          let yInf = 30;
+          let cleanMapeo = {};
+
+          const p = proveedores.find((x) => x.id === provSel);
+          if (p && p.mapeo_columnas) {
+            try {
+              const savedMapeo = JSON.parse(p.mapeo_columnas);
+              Object.entries(savedMapeo).forEach(([k, v]) => {
+                if (k === 'yLimiteSuperior') ySup = Number(v);
+                else if (k === 'yLimiteInferior') yInf = Number(v);
+                else cleanMapeo[k] = v;
+              });
+            } catch {}
+            setMapeo(cleanMapeo);
+            setYLimiteSuperior(ySup);
+            setYLimiteInferior(yInf);
+          } else {
+            const m = {};
+            (data.columnas || []).forEach((_, i) => { m[i] = 'ignorar'; });
+            setMapeo(m);
+            setYLimiteSuperior(850);
+            setYLimiteInferior(30);
+          }
+
+          if (p) {
+            const finalMargen = Number(p.margen_default) || 40;
+            const finalDescuento = Number(p.descuento_default) || 0;
+            setMargen(finalMargen);
+            setDescuento(finalDescuento);
+
+            if (p.mapeo_columnas) {
+              const prev = generarPreview(
+                data.filas || [],
+                data.columnas || [],
+                cleanMapeo,
+                finalMargen,
+                finalDescuento,
+                data.yCoords || [],
+                ySup,
+                yInf
+              );
+              if (prev.length > 0) {
+                setPreview(prev);
+                setModalPaso(3);
+                return;
+              }
+            }
+          }
+
         } else {
           // Excel/CSV: leer en el cliente con xlsx
           const buf = await file.arrayBuffer();
@@ -230,7 +311,38 @@ function ListasContent() {
           setColumnas(headers);
           setFilas(rows);
           setTotalFilas(rows.length);
-          setMapeo(autoMapear(headers));
+
+          let cleanMapeo = {};
+          const p = proveedores.find((x) => x.id === provSel);
+          if (p) {
+            const finalMargen = Number(p.margen_default) || 40;
+            const finalDescuento = Number(p.descuento_default) || 0;
+            setMargen(finalMargen);
+            setDescuento(finalDescuento);
+
+            if (p.mapeo_columnas) {
+              try {
+                const savedMapeo = JSON.parse(p.mapeo_columnas);
+                Object.entries(savedMapeo).forEach(([k, v]) => {
+                  if (k !== 'yLimiteSuperior' && k !== 'yLimiteInferior') {
+                    cleanMapeo[k] = v;
+                  }
+                });
+              } catch {}
+              setMapeo(cleanMapeo);
+
+              const prev = generarPreview(rows, headers, cleanMapeo, finalMargen, finalDescuento);
+              if (prev.length > 0) {
+                setPreview(prev);
+                setModalPaso(3);
+                return;
+              }
+            } else {
+              setMapeo(autoMapear(headers));
+            }
+          } else {
+            setMapeo(autoMapear(headers));
+          }
         }
       }
 
@@ -253,7 +365,7 @@ function ListasContent() {
       return;
     }
     setErrorModal('');
-    const prev = generarPreview(filas, columnas, mapeo, margen, descuento);
+    const prev = generarPreview(filas, columnas, mapeo, margen, descuento, yCoords, yLimiteSuperior, yLimiteInferior);
     setPreview(prev);
     setModalPaso(3);
   };
@@ -274,7 +386,7 @@ function ListasContent() {
           modo,
           file_id: modalArchivo.fuente === 'drive' ? modalArchivo.id : undefined,
           guardar_mapeo: guardarMapeo,
-          mapeo_columnas: guardarMapeo ? mapeo : undefined,
+          mapeo_columnas: guardarMapeo ? { ...mapeo, yLimiteSuperior, yLimiteInferior } : undefined,
         }),
       });
       const data = await res.json();
@@ -338,7 +450,7 @@ function ListasContent() {
   const actualizarMargen = (nuevoMargen) => {
     setMargen(nuevoMargen);
     if (modalPaso === 3 && filas.length > 0) {
-      setPreview(generarPreview(filas, columnas, mapeo, nuevoMargen, descuento));
+      setPreview(generarPreview(filas, columnas, mapeo, nuevoMargen, descuento, yCoords, yLimiteSuperior, yLimiteInferior));
     }
   };
 
@@ -346,7 +458,7 @@ function ListasContent() {
   const actualizarDescuento = (nuevoDescuento) => {
     setDescuento(nuevoDescuento);
     if (modalPaso === 3 && filas.length > 0) {
-      setPreview(generarPreview(filas, columnas, mapeo, margen, nuevoDescuento));
+      setPreview(generarPreview(filas, columnas, mapeo, margen, nuevoDescuento, yCoords, yLimiteSuperior, yLimiteInferior));
     }
   };
 
@@ -641,6 +753,82 @@ function ListasContent() {
                     {columnas.length} columnas detectadas · {totalFilas} filas
                     {totalFilas > 500 && <span style={{ color: '#f59e0b' }}> (mostrando primeras 500)</span>}
                   </div>
+
+                  {/* Límites de corte Y (solo para PDFs, mostrado primero) */}
+                  {modalArchivo.tipo === 'pdf' && (
+                    <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '16px', border: '1px solid #222', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 14, fontWeight: 800, letterSpacing: 0.5, borderBottom: '1px solid #1a1a1a', paddingBottom: 6 }}>
+                        ✂️ LÍMITES DE PÁGINA (PDF)
+                      </div>
+                      
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <span style={{ fontSize: 11, color: '#888', letterSpacing: 1 }}>IGNORAR CABECERA (Y MÁXIMA):</span>
+                          <span style={{ fontSize: 12, color: '#3b82f6', fontWeight: 700 }}>{yLimiteSuperior} pts</span>
+                        </div>
+                        <input
+                          type="range" min={0} max={1000} value={yLimiteSuperior}
+                          style={{ '--val': `${yLimiteSuperior / 1000 * 100}%` }}
+                          onChange={(e) => setYLimiteSuperior(Number(e.target.value))}
+                        />
+                        <div style={{ fontSize: 10, color: '#444', marginTop: 2 }}>Corta el encabezado superior. Las filas arriba de este límite se omiten.</div>
+                      </div>
+
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <span style={{ fontSize: 11, color: '#888', letterSpacing: 1 }}>IGNORAR PIE (Y MÍNIMA):</span>
+                          <span style={{ fontSize: 12, color: '#ef4444', fontWeight: 700 }}>{yLimiteInferior} pts</span>
+                        </div>
+                        <input
+                          type="range" min={0} max={1000} value={yLimiteInferior}
+                          style={{ '--val': `${yLimiteInferior / 1000 * 100}%` }}
+                          onChange={(e) => setYLimiteInferior(Number(e.target.value))}
+                        />
+                        <div style={{ fontSize: 10, color: '#444', marginTop: 2 }}>Corta el pie de página inferior. Las filas debajo de este límite se omiten.</div>
+                      </div>
+
+                      {/* Visual Preview container for the first 15 rows */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ fontSize: 11, color: '#555', letterSpacing: 0.5, fontWeight: 600 }}>VISTA PREVIA DE FILAS SEGÚN LÍMITES (primeras 15):</div>
+                        <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #1a1a1a', borderRadius: 8, background: '#060606', padding: '6px' }}>
+                          {filas.slice(0, 15).map((row, idx) => {
+                            const yVal = yCoords[idx] || 0;
+                            const isIncluded = yVal >= yLimiteInferior && yVal <= yLimiteSuperior;
+                            const cellsText = row.filter(Boolean).join(' | ');
+                            
+                            return (
+                              <div key={idx} style={{ 
+                                display: 'flex', 
+                                gap: 10, 
+                                padding: '6px 10px', 
+                                marginBottom: 4, 
+                                borderRadius: 6,
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                                border: isIncluded ? '1px solid #16a34a30' : '1px solid #ef444420',
+                                background: isIncluded ? '#16a34a0a' : '#ef444405',
+                                opacity: isIncluded ? 1 : 0.45,
+                                color: isIncluded ? '#e5e7eb' : '#888',
+                                textDecoration: isIncluded ? 'none' : 'line-through',
+                                transition: 'all 0.15s'
+                              }}>
+                                <span style={{ 
+                                  color: isIncluded ? '#22c55e' : '#ef4444', 
+                                  fontWeight: 700,
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  [Y: {yVal}] {isIncluded ? 'INC' : 'EXC'}
+                                </span>
+                                <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                  {cellsText || '(Fila vacía)'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div style={{ background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 10, overflow: 'hidden' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 30px 160px', padding: '8px 14px', borderBottom: '1px solid #1a1a1a', fontSize: 10, color: '#444', letterSpacing: 2, fontWeight: 700 }}>

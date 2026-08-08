@@ -1,12 +1,11 @@
-import { getSheetsClient, getRows } from '../../../lib/sheets';
+import { getSheetsClient, getBatchRows } from '../../../lib/sheets';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
 
   try {
     const sheets = await getSheetsClient();
-    const ventas = await getRows(sheets, 'ventas');
-    const items = await getRows(sheets, 'venta_items');
+    const { ventas = [], venta_items: items = [] } = await getBatchRows(sheets, ['ventas', 'venta_items']);
 
     // Si se pasa ?fecha=DD/MM/AAAA se filtra por esa fecha; si no, por hoy
     const fechaFiltro = req.query.fecha || new Date().toLocaleDateString('es-AR');

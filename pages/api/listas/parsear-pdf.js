@@ -23,11 +23,12 @@ export default async function handler(req, res) {
 
   try {
     const buffer = Buffer.from(base64, 'base64');
-    const { columnas, filas, total_filas, advertencia } = await parsearPDF(buffer);
+    const { columnas, filas, yCoords, total_filas, advertencia } = await parsearPDF(buffer);
 
     return res.status(200).json({
       columnas,
       filas: filas.slice(0, 500), // previsualizar máximo 500 en el frontend
+      yCoords: yCoords ? yCoords.slice(0, 500) : [],
       total_filas,
       advertencia,
     });
