@@ -34,6 +34,10 @@ export default function Home() {
           style={{ padding: '24px 48px', background: '#0f2a1a', border: '2px solid #14532d', borderRadius: 14, color: '#86efac', fontSize: 22, fontWeight: 800, cursor: 'pointer', letterSpacing: 1 }}>
           📋 LISTAS
         </button>
+        <button onClick={() => router.push('/baterias/carga')}
+          style={{ padding: '24px 48px', background: '#451a03', border: '2px solid #b45309', borderRadius: 14, color: '#fcd34d', fontSize: 22, fontWeight: 800, cursor: 'pointer', letterSpacing: 1 }}>
+          ⚡ CARGA BATERÍAS
+        </button>
       </div>
     </div>
   );
